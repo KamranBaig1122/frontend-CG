@@ -1,0 +1,135 @@
+import { useState, useContext } from 'react';
+import axios from 'axios';
+import AuthContext from '../context/AuthContext';
+import toast from 'react-hot-toast';
+import { X, Calendar } from 'lucide-react';
+
+const ScheduleTicketModal = ({ ticket, onClose, onSuccess }) => {
+    const { user } = useContext(AuthContext);
+    const [scheduledDate, setScheduledDate] = useState(
+        ticket.scheduledDate ? new Date(ticket.scheduledDate).toISOString().slice(0, 16) : ''
+    );
+    const [loading, setLoading] = useState(false);
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+
+        try {
+            const config = {
+                headers: { Authorization: `Bearer ${user.token}` },
+            };
+            await axios.patch(`http://localhost:5000/api/tickets/${ticket._id}/schedule`,
+                { scheduledDate },
+                config
+            );
+            toast.success('Ticket scheduled successfully');
+            onSuccess();
+            onClose();
+        } catch (error) {
+            console.error(error);
+            toast.error('Failed to schedule ticket');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                    <h2><Calendar size={20} /> Schedule Ticket</h2>
+                    <button className="close-btn" onClick={onClose}><X size={20} /></button>
+                </div>
+
+                <form onSubmit={handleSubmit}>
+                    <div className="modal-body">
+                        <p className="ticket-title">{ticket.title}</p>
+                        <div className="form-group">
+                            <label>Scheduled Date & Time</label>
+                            <input
+                                type="datetime-local"
+                                className="form-control"
+                                value={scheduledDate}
+                                onChange={(e) => setScheduledDate(e.target.value)}
+                                required
+                            />
+                        </div>
+                    </div>
+
+                    <div className="modal-footer">
+                        <button type="button" className="btn btn-secondary" onClick={onClose}>
+                            Cancel
+                        </button>
+                        <button type="submit" className="btn btn-primary" disabled={loading}>
+                            {loading ? 'Scheduling...' : 'Schedule Ticket'}
+                        </button>
+                    </div>
+                </form>
+
+                <style>{`
+                    .modal-overlay {
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        background: rgba(0, 0, 0, 0.5);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        z-index: 1000;
+                    }
+                    .modal-content {
+                        background: white;
+                        border-radius: 12px;
+                        width: 90%;
+                        max-width: 500px;
+                        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+                    }
+                    .modal-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        padding: 20px;
+                        border-bottom: 1px solid #e5e7eb;
+                    }
+                    .modal-header h2 {
+                        margin: 0;
+                        font-size: 18px;
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                    }
+                    .close-btn {
+                        background: none;
+                        border: none;
+                        cursor: pointer;
+                        padding: 4px;
+                        border-radius: 4px;
+                    }
+                    .close-btn:hover {
+                        background: #f3f4f6;
+                    }
+                    .modal-body {
+                        padding: 20px;
+                    }
+                    .ticket-title {
+                        font-weight: 600;
+                        margin-bottom: 16px;
+                        color: var(--text-dark);
+                    }
+                    .modal-footer {
+                        padding: 16px 20px;
+                        border-top: 1px solid #e5e7eb;
+                        display: flex;
+                        justify-content: flex-end;
+                        gap: 12px;
+                    }
+                `}</style>
+            </div>
+        </div>
+    );
+};
+
+export default ScheduleTicketModal;
