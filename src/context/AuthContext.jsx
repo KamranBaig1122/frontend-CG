@@ -1,5 +1,6 @@
 import { createContext, useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { apiBaseUrl } from '../config/api';
 
 const AuthContext = createContext();
 
@@ -13,7 +14,7 @@ export const AuthProvider = ({ children }) => {
     const logout = useCallback(async () => {
         try {
             if (user?.token) {
-                await axios.post('http://localhost:5000/api/users/logout', {}, {
+                await axios.post(`${apiBaseUrl}/users/logout`, {}, {
                     headers: { Authorization: `Bearer ${user.token}` }
                 });
             }
@@ -27,7 +28,7 @@ export const AuthProvider = ({ children }) => {
     }, [user]);
 
     const login = async (email, password) => {
-        const { data } = await axios.post('http://localhost:5000/api/users/login', { email, password });
+        const { data } = await axios.post(`${apiBaseUrl}/users/login`, { email, password });
         setUser(data);
         localStorage.setItem('user', JSON.stringify(data));
         return data;
@@ -37,7 +38,7 @@ export const AuthProvider = ({ children }) => {
         try {
             if (!user?.token) return;
 
-            const { data } = await axios.post('http://localhost:5000/api/users/refresh', {
+            const { data } = await axios.post(`${apiBaseUrl}/users/refresh`, {
                 token: user.token
             });
 

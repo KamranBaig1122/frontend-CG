@@ -18,7 +18,13 @@ import TemplateManagement from './pages/TemplateManagement';
 import UserManagement from './pages/UserManagement';
 import HelpSupport from './pages/HelpSupport';
 import Reports from './pages/Reports';
+import OverallReport from './pages/OverallReport';
+import TicketsReport from './pages/TicketsReport';
+import InspectorLeaderboard from './pages/InspectorLeaderboard';
+import PrivateInspectionsReport from './pages/PrivateInspectionsReport';
+import InspectionFormsReport from './pages/InspectionFormsReport';
 import More from './pages/More'; // Added based on new route
+import StartWork from './pages/StartWork';
 import { Toaster } from 'react-hot-toast';
 
 function App() {
@@ -44,8 +50,14 @@ function App() {
           <Route path="/templates" element={<PrivateRoute><Layout><TemplateManagement /></Layout></PrivateRoute>} />
           <Route path="/users" element={<PrivateRoute><Layout><UserManagement /></Layout></PrivateRoute>} />
           <Route path="/reports" element={<PrivateRoute><Layout><Reports /></Layout></PrivateRoute>} />
+          <Route path="/reports/overall" element={<PrivateRoute><Layout><OverallReport /></Layout></PrivateRoute>} />
+          <Route path="/reports/tickets" element={<PrivateRoute><Layout><TicketsReport /></Layout></PrivateRoute>} />
+          <Route path="/reports/inspectors" element={<PrivateRoute><Layout><InspectorLeaderboard /></Layout></PrivateRoute>} />
+          <Route path="/reports/private-inspections" element={<PrivateRoute><Layout><PrivateInspectionsReport /></Layout></PrivateRoute>} />
+          <Route path="/reports/inspection-forms" element={<PrivateRoute><Layout><InspectionFormsReport /></Layout></PrivateRoute>} />
           <Route path="/help" element={<PrivateRoute><Layout><HelpSupport /></Layout></PrivateRoute>} />
           <Route path="/more" element={<PrivateRoute><Layout><More /></Layout></PrivateRoute>} />
+          <Route path="/start-work" element={<PrivateRoute><Layout><StartWork /></Layout></PrivateRoute>} />
         </Routes>
       </Router>
     </AuthProvider>

@@ -2,6 +2,7 @@ import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import AuthContext from '../context/AuthContext';
+import { apiBaseUrl } from '../config/api';
 import toast from 'react-hot-toast';
 import { ClipboardList, ArrowLeft, Save } from 'lucide-react';
 
@@ -29,9 +30,9 @@ const CreateInspection = () => {
         try {
             const config = { headers: { Authorization: `Bearer ${user.token}` } };
             const [templatesRes, locationsRes, usersRes] = await Promise.all([
-                axios.get('http://localhost:5000/api/templates', config),
-                axios.get('http://localhost:5000/api/locations', config),
-                axios.get('http://localhost:5000/api/users', config),
+                axios.get(`${apiBaseUrl}/templates`, config),
+                axios.get(`${apiBaseUrl}/locations`, config),
+                axios.get(`${apiBaseUrl}/users`, config),
             ]);
             setTemplates(templatesRes.data);
             setLocations(locationsRes.data);
@@ -80,7 +81,7 @@ const CreateInspection = () => {
             };
 
             console.log('Sending inspection data:', inspectionData);
-            await axios.post('http://localhost:5000/api/inspections', inspectionData, config);
+            await axios.post(`${apiBaseUrl}/inspections`, inspectionData, config);
             toast.success('Inspection created and assigned successfully');
             navigate('/inspections');
         } catch (error) {

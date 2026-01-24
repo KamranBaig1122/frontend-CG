@@ -2,6 +2,7 @@ import { useState, useEffect, useContext } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import AuthContext from '../context/AuthContext';
+import { apiBaseUrl } from '../config/api';
 import toast from 'react-hot-toast';
 import { ArrowLeft, Check } from 'lucide-react';
 
@@ -40,7 +41,7 @@ const BulkTicketCreate = () => {
                     headers: { Authorization: `Bearer ${user.token}` },
                 };
 
-                await axios.post('http://localhost:5000/api/tickets', ticketData, config);
+                await axios.post(`${apiBaseUrl}/tickets`, ticketData, config);
                 successCount++;
                 setCreated(successCount);
             } catch (error) {

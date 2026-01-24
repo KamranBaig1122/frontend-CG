@@ -2,10 +2,12 @@ import { useState, useEffect, useContext } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import AuthContext from '../context/AuthContext';
+import { apiBaseUrl } from '../config/api';
 import PhotoUpload from '../components/PhotoUpload';
 import CreateTicketPrompt from '../components/CreateTicketPrompt';
 import { ChevronLeft, ChevronRight, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 const ImprovedInspectionWizard = () => {
     const { user } = useContext(AuthContext);
@@ -34,10 +36,10 @@ const ImprovedInspectionWizard = () => {
 
                 if (id) {
                     // Fetch existing inspection to perform
-                    const { data: inspection } = await axios.get(`http://localhost:5000/api/inspections/${id}`, config);
+                    const { data: inspection } = await axios.get(`${apiBaseUrl}/inspections/${id}`, config);
 
                     // Fetch the FULL template details to get item types/weights
-                    const { data: fullTemplate } = await axios.get(`http://localhost:5000/api/templates/${inspection.template._id}`, config);
+                    const { data: fullTemplate } = await axios.get(`${apiBaseUrl}/templates/${inspection.template._id}`, config);
 
                     // Populate state from inspection
                     setSelectedLocation(inspection.location._id);
@@ -62,8 +64,8 @@ const ImprovedInspectionWizard = () => {
                 } else {
                     // Fetch lists for new inspection
                     const [locRes, tempRes] = await Promise.all([
-                        axios.get('http://localhost:5000/api/locations', config),
-                        axios.get('http://localhost:5000/api/templates', config),
+                        axios.get(`${apiBaseUrl}/locations`, config),
+                        axios.get(`${apiBaseUrl}/templates`, config),
                     ]);
                     setLocations(locRes.data);
                     setTemplates(tempRes.data);
@@ -104,7 +106,7 @@ const ImprovedInspectionWizard = () => {
     const handleCreateTicket = async (ticketData) => {
         try {
             const config = { headers: { Authorization: `Bearer ${user.token}` } };
-            const { data } = await axios.post('http://localhost:5000/api/tickets', ticketData, config);
+            const { data } = await axios.post(`${apiBaseUrl}/tickets`, ticketData, config);
             setCreatedTickets([...createdTickets, data]);
             toast.success('Ticket created!');
             setShowTicketPrompt(null);
@@ -186,10 +188,10 @@ const ImprovedInspectionWizard = () => {
             const config = { headers: { Authorization: `Bearer ${user.token}` } };
 
             if (id) {
-                await axios.put(`http://localhost:5000/api/inspections/${id}`, inspectionData, config);
+                await axios.put(`${apiBaseUrl}/inspections/${id}`, inspectionData, config);
                 toast.success('Inspection completed successfully!');
             } else {
-                await axios.post('http://localhost:5000/api/inspections', inspectionData, config);
+                await axios.post(`${apiBaseUrl}/inspections`, inspectionData, config);
                 toast.success('Inspection submitted successfully!');
             }
 
@@ -261,6 +263,65 @@ const ImprovedInspectionWizard = () => {
             color: var(--text-muted);
             margin: 0;
         }
+
+        /* Mobile Optimizations */
+        @media (max-width: 768px) {
+            .wizard-container {
+                padding: 16px;
+                min-height: calc(100vh - 80px);
+            }
+            
+            .wizard-card {
+                padding: 20px;
+                border-radius: 12px;
+            }
+            
+            .wizard-header h1 {
+                font-size: 24px;
+            }
+            
+            .section-header {
+                font-size: 18px;
+                padding: 16px;
+            }
+            
+            .item-card {
+                padding: 16px;
+                margin-bottom: 12px;
+            }
+            
+            .score-buttons {
+                flex-direction: column;
+                gap: 8px;
+            }
+            
+            .score-btn {
+                width: 100%;
+                padding: 16px;
+                font-size: 16px;
+            }
+            
+            .navigation-buttons {
+                flex-direction: column-reverse;
+                gap: 12px;
+            }
+            
+            .navigation-buttons button {
+                width: 100%;
+                padding: 14px;
+                font-size: 16px;
+            }
+            
+            .photo-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px;
+            }
+            
+            .comment-textarea {
+                min-height: 100px;
+                font-size: 16px; /* Prevents zoom on iOS */
+            }
+        }
         
         .form-group {
             margin-bottom: 24px;
@@ -306,34 +367,40 @@ const ImprovedInspectionWizard = () => {
         }
         
         .btn-outline {
-            background: white;
-            color: var(--text-dark);
-            border: 2px solid #e2e8f0;
+            background: white !important;
+            color: #475569 !important;
+            border: 2px solid #e2e8f0 !important;
         }
         
         .btn-outline:hover {
-            border-color: #cbd5e1;
-            background: #f8fafc;
+            border-color: #3b82f6 !important;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+            color: white !important;
+            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3) !important;
         }
         
         .btn-primary {
-            background: var(--primary-color);
-            color: white;
-            border: 2px solid transparent;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+            color: white !important;
+            border: 2px solid transparent !important;
+            box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3) !important;
         }
         
         .btn-primary:hover {
-            background: #2563eb;
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+            box-shadow: 0 6px 12px rgba(59, 130, 246, 0.4) !important;
         }
         
         .btn-secondary {
-            background: #64748b;
-            color: white;
-            border: 2px solid transparent;
+            background: linear-gradient(135deg, #64748b 0%, #475569 100%) !important;
+            color: white !important;
+            border: 2px solid transparent !important;
+            box-shadow: 0 4px 6px -1px rgba(100, 116, 139, 0.3) !important;
         }
         
         .btn-secondary:hover {
-            background: #475569;
+            background: linear-gradient(135deg, #475569 0%, #334155 100%) !important;
+            box-shadow: 0 6px 12px rgba(100, 116, 139, 0.4) !important;
         }
         
         .progress-bar { 
@@ -427,52 +494,70 @@ const ImprovedInspectionWizard = () => {
             min-width: 120px;
             padding: 12px 20px;
             font-weight: 600;
-            border: 2px solid #e2e8f0;
-            background: white;
+            border: 2px solid #e2e8f0 !important;
+            background: white !important;
+            color: #475569 !important;
             transition: all 0.2s;
         }
         
         .button-group .btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+            border-color: #3b82f6 !important;
+            color: white !important;
         }
         
-        .btn-success-active { 
-            background: #10b981 !important;
+        .button-group .btn.btn-success-active { 
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
             color: white !important;
             border-color: #10b981 !important;
+            box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3) !important;
         }
         
-        .btn-danger-active { 
-            background: #ef4444 !important;
+        .button-group .btn.btn-danger-active { 
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
             color: white !important;
             border-color: #ef4444 !important;
+            box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3) !important;
+        }
+        
+        .button-group .btn.btn-success-active:hover {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+            box-shadow: 0 6px 12px rgba(16, 185, 129, 0.4) !important;
+        }
+        
+        .button-group .btn.btn-danger-active:hover {
+            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important;
+            box-shadow: 0 6px 12px rgba(239, 68, 68, 0.4) !important;
         }
         
         .rating-btn { 
             padding: 12px 20px;
-            border: 2px solid #e2e8f0;
-            background: white;
+            border: 2px solid #e2e8f0 !important;
+            background: white !important;
+            color: #475569 !important;
             border-radius: 10px;
             cursor: pointer;
             transition: all 0.2s;
             font-weight: 600;
             font-size: 16px;
-            color: var(--text-dark);
             min-width: 50px;
         }
         
         .rating-btn:hover {
-            border-color: var(--primary-color);
-            background: #f0f9ff;
+            border-color: #3b82f6 !important;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+            color: white !important;
             transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3) !important;
         }
         
         .rating-btn.active { 
-            background: var(--primary-color);
-            color: white;
-            border-color: var(--primary-color);
-            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+            color: white !important;
+            border-color: #3b82f6 !important;
+            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3) !important;
         }
         
         .item-controls textarea {
@@ -586,10 +671,7 @@ const ImprovedInspectionWizard = () => {
     if (loading) {
         return (
             <div className="wizard-container">
-                <div className="loading-card">
-                    <div className="spinner"></div>
-                    <p>Loading inspection data...</p>
-                </div>
+                <LoadingSpinner message="Loading inspection data..." type="tail-spin" color="#3b82f6" height={80} width={80} />
                 <style>{wizardStyles}</style>
             </div>
         );

@@ -2,6 +2,7 @@ import { useState, useEffect, useContext } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import AuthContext from '../context/AuthContext';
+import { apiBaseUrl } from '../config/api';
 import toast from 'react-hot-toast';
 import { ArrowLeft, Save } from 'lucide-react';
 
@@ -44,7 +45,7 @@ const TicketForm = () => {
                 const config = {
                     headers: { Authorization: `Bearer ${user.token}` },
                 };
-                const { data } = await axios.get('http://localhost:5000/api/locations', config);
+                const { data } = await axios.get(`${apiBaseUrl}/locations`, config);
                 setLocations(data);
             } catch (error) {
                 console.error(error);
@@ -61,7 +62,7 @@ const TicketForm = () => {
                 const config = {
                     headers: { Authorization: `Bearer ${user.token}` },
                 };
-                const { data } = await axios.get('http://localhost:5000/api/users', config);
+                const { data } = await axios.get(`${apiBaseUrl}/users`, config);
                 console.log('Fetched users:', data);
                 setUsers(data);
             } catch (error) {
@@ -78,7 +79,7 @@ const TicketForm = () => {
             const config = {
                 headers: { Authorization: `Bearer ${user.token}` },
             };
-            await axios.post('http://localhost:5000/api/tickets', formData, config);
+            await axios.post(`${apiBaseUrl}/tickets`, formData, config);
             toast.success('Ticket created successfully');
             navigate('/tickets');
         } catch (error) {

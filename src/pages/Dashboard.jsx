@@ -2,13 +2,14 @@ import { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import AuthContext from '../context/AuthContext';
+import { apiBaseUrl } from '../config/api';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
     PieChart, Pie, Cell
 } from 'recharts';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
-import { ClipboardList, AlertCircle, CheckCircle, Clock, Calendar, ArrowRight, MapPin, Building2 } from 'lucide-react';
+import { ClipboardList, AlertCircle, CheckCircle, Clock, Calendar, ArrowRight, MapPin, Building2, Filter, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../components/LoadingSpinner';
 
@@ -20,38 +21,140 @@ const Dashboard = () => {
     const [dateRange, setDateRange] = useState([new Date(new Date().setDate(new Date().getDate() - 30)), new Date()]);
     const [startDate, endDate] = dateRange;
     const [loading, setLoading] = useState(true);
+    const [selectedLocation, setSelectedLocation] = useState('all');
+    const [dashboardMetrics, setDashboardMetrics] = useState({
+        totalInspections: 0,
+        averageScore: 0,
+        openIssues: 0,
+        resolvedIssues: 0,
+        avgAppaScore: 5,
+        avgResponseTime: 0
+    });
+    const [inspectionsChartData, setInspectionsChartData] = useState([]);
+    const [ticketsChartData, setTicketsChartData] = useState([]);
+    const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
+    const [activeDateFilter, setActiveDateFilter] = useState('last_30_days');
 
     useEffect(() => {
+        let isMounted = true;
         const fetchData = async () => {
-            if (!user || !user.token) return;
+            if (!user || !user.token) {
+                if (isMounted) setLoading(false);
+                return;
+            }
             try {
                 const config = { headers: { Authorization: `Bearer ${user.token}` } };
                 const requests = [
-                    axios.get('http://localhost:5000/api/inspections', config),
-                    axios.get('http://localhost:5000/api/tickets', config)
+                    axios.get(`${apiBaseUrl}/inspections`, config),
+                    axios.get(`${apiBaseUrl}/tickets`, config),
+                    axios.get(`${apiBaseUrl}/locations`, config)
                 ];
-
-                if (user.role === 'client') {
-                    requests.push(axios.get('http://localhost:5000/api/locations', config));
-                }
 
                 const responses = await Promise.all(requests);
 
-                setInspections(responses[0].data);
-                setTickets(responses[1].data);
-
-                if (user.role === 'client') {
+                if (isMounted) {
+                    setInspections(responses[0].data);
+                    setTickets(responses[1].data);
                     setLocations(responses[2].data);
+                    setLoading(false);
                 }
-                setLoading(false);
             } catch (error) {
-                console.error(error);
-                toast.error('Failed to load dashboard  data');
-                setLoading(false);
+                if (isMounted) {
+                    console.error(error);
+                    if (error.response?.status !== 429) { // Don't show error toast for rate limit (handled by interceptor)
+                        toast.error('Failed to load dashboard data');
+                    }
+                    setLoading(false);
+                }
             }
         };
         fetchData();
+        return () => { isMounted = false; };
     }, [user]);
+
+    // Fetch dashboard metrics when filters change
+    useEffect(() => {
+        let isMounted = true;
+        const fetchDashboardMetrics = async () => {
+            if (!user || !user.token || !startDate || !endDate) return;
+            try {
+                const config = { headers: { Authorization: `Bearer ${user.token}` } };
+                const params = {
+                    start_date: startDate.toISOString().split('T')[0],
+                    end_date: endDate.toISOString().split('T')[0],
+                    location_id: selectedLocation
+                };
+
+                const [summary, inspectionsChart, ticketsChart] = await Promise.all([
+                    axios.get(`${apiBaseUrl}/dashboard/summary`, { ...config, params }),
+                    axios.get(`${apiBaseUrl}/dashboard/inspections_over_time`, { ...config, params }),
+                    axios.get(`${apiBaseUrl}/dashboard/tickets_over_time`, { ...config, params })
+                ]);
+
+                if (isMounted) {
+                    setDashboardMetrics(summary.data);
+                    setInspectionsChartData(inspectionsChart.data);
+                    setTicketsChartData(ticketsChart.data);
+                }
+            } catch (error) {
+                if (isMounted && error.response?.status !== 429) {
+                    console.error('Failed to fetch dashboard metrics:', error);
+                }
+            }
+        };
+
+        if ((user?.role === 'admin' || user?.role === 'sub_admin') && startDate && endDate) {
+            fetchDashboardMetrics();
+        }
+        return () => { isMounted = false; };
+    }, [user, startDate, endDate, selectedLocation]);
+
+    // Date range quick filter functions
+    const setDateRangeFilter = (filterType) => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        let start, end = new Date();
+        end.setHours(23, 59, 59, 999);
+
+        switch (filterType) {
+            case 'today':
+                start = new Date(today);
+                break;
+            case 'this_week':
+                const dayOfWeek = today.getDay();
+                const diff = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+                start = new Date(today);
+                start.setDate(diff);
+                start.setHours(0, 0, 0, 0);
+                break;
+            case 'this_month':
+                start = new Date(today.getFullYear(), today.getMonth(), 1);
+                break;
+            case 'last_month':
+                start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                end = new Date(today.getFullYear(), today.getMonth(), 0);
+                end.setHours(23, 59, 59, 999);
+                break;
+            case 'last_30_days':
+                start = new Date(today);
+                start.setDate(start.getDate() - 30);
+                break;
+            case 'last_60_days':
+                start = new Date(today);
+                start.setDate(start.getDate() - 60);
+                break;
+            case 'custom':
+                setShowCustomDatePicker(true);
+                setActiveDateFilter('custom');
+                return;
+            default:
+                return;
+        }
+
+        setDateRange([start, end]);
+        setShowCustomDatePicker(false);
+        setActiveDateFilter(filterType);
+    };
 
     // Filter data based on date range
     const filteredInspections = inspections.filter(item => {
@@ -64,7 +167,7 @@ const Dashboard = () => {
         return date >= startDate && date <= endDate;
     });
 
-    if (loading) return <LoadingSpinner message="Loading dashboard..." />;
+    if (loading) return <LoadingSpinner message="Loading dashboard..." type="three-dots" color="#3b82f6" height={60} width={60} />;
 
     // --- SUPERVISOR VIEW ---
     if (user?.role === 'supervisor') {
@@ -356,31 +459,24 @@ const Dashboard = () => {
     }
 
     // --- ADMIN AND SUB-ADMIN VIEW ---
-    const totalInspections = filteredInspections.length;
-    const avgScore = totalInspections > 0
-        ? Math.round(filteredInspections.reduce((acc, curr) => acc + (curr.totalScore || 0), 0) / totalInspections)
-        : 0;
-    const openTickets = filteredTickets.filter(t => ['open', 'in_progress'].includes(t.status)).length;
-    const resolvedTickets = filteredTickets.filter(t => ['resolved', 'closed'].includes(t.status)).length;
+    const formatChartDate = (dateString) => {
+        const date = new Date(dateString);
+        const month = date.toLocaleString('default', { month: 'short' });
+        const day = date.getDate();
+        return `${month} ${day}`;
+    };
 
-    // Prepare chart data
-    const inspectionsByDate = filteredInspections.reduce((acc, curr) => {
-        const date = new Date(curr.createdAt).toLocaleDateString();
-        acc[date] = (acc[date] || 0) + 1;
-        return acc;
-    }, {});
+    const formattedInspectionsData = inspectionsChartData.map(item => ({
+        date: formatChartDate(item.date),
+        count: item.count,
+        fullDate: item.date
+    }));
 
-    const inspectionChartData = Object.keys(inspectionsByDate).map(date => ({
-        date,
-        count: inspectionsByDate[date]
-    })).sort((a, b) => new Date(a.date) - new Date(b.date));
-
-    const ticketStatusData = [
-        { name: 'Open', value: filteredTickets.filter(t => t.status === 'open').length, color: '#ef4444' },
-        { name: 'In Progress', value: filteredTickets.filter(t => t.status === 'in_progress').length, color: '#f59e0b' },
-        { name: 'Resolved', value: filteredTickets.filter(t => t.status === 'resolved').length, color: '#10b981' },
-        { name: 'Closed', value: filteredTickets.filter(t => t.status === 'closed').length, color: '#6b7280' },
-    ].filter(item => item.value > 0);
+    const formattedTicketsData = ticketsChartData.map(item => ({
+        date: formatChartDate(item.date),
+        count: item.count,
+        fullDate: item.date
+    }));
 
     return (
         <div className="dashboard-container">
@@ -389,17 +485,103 @@ const Dashboard = () => {
                     <h1>Dashboard</h1>
                     <p className="subtitle">Overview of your cleaning operations</p>
                 </div>
-                <div className="date-filter">
-                    <Calendar size={20} className="calendar-icon" />
-                    <DatePicker
-                        selectsRange={true}
-                        startDate={startDate}
-                        endDate={endDate}
-                        onChange={(update) => setDateRange(update)}
-                        isClearable={true}
-                        className="date-picker-input"
-                        placeholderText="Select date range"
-                    />
+            </div>
+
+            {/* Filters Section */}
+            <div className="filters-section">
+                <div className="filter-group">
+                    <label className="filter-label">
+                        <MapPin size={16} />
+                        Location
+                    </label>
+                    <select
+                        className="location-filter"
+                        value={selectedLocation}
+                        onChange={(e) => setSelectedLocation(e.target.value)}
+                    >
+                        <option value="all">All areas</option>
+                        {locations.map(location => (
+                            <option key={location._id} value={location._id}>
+                                {location.name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                <div className="filter-group">
+                    <label className="filter-label">
+                        <Calendar size={16} />
+                        Date Range
+                    </label>
+                    <div className="date-filter-buttons">
+                        <button
+                            className={`date-filter-btn ${activeDateFilter === 'today' ? 'active' : ''}`}
+                            onClick={() => setDateRangeFilter('today')}
+                        >
+                            Today
+                        </button>
+                        <button
+                            className={`date-filter-btn ${activeDateFilter === 'this_week' ? 'active' : ''}`}
+                            onClick={() => setDateRangeFilter('this_week')}
+                        >
+                            This week
+                        </button>
+                        <button
+                            className={`date-filter-btn ${activeDateFilter === 'this_month' ? 'active' : ''}`}
+                            onClick={() => setDateRangeFilter('this_month')}
+                        >
+                            This month
+                        </button>
+                        <button
+                            className={`date-filter-btn ${activeDateFilter === 'last_month' ? 'active' : ''}`}
+                            onClick={() => setDateRangeFilter('last_month')}
+                        >
+                            Last month
+                        </button>
+                        <button
+                            className={`date-filter-btn ${activeDateFilter === 'last_30_days' ? 'active' : ''}`}
+                            onClick={() => setDateRangeFilter('last_30_days')}
+                        >
+                            Last 30 days
+                        </button>
+                        <button
+                            className={`date-filter-btn ${activeDateFilter === 'last_60_days' ? 'active' : ''}`}
+                            onClick={() => setDateRangeFilter('last_60_days')}
+                        >
+                            Last 60 days
+                        </button>
+                        <button
+                            className={`date-filter-btn ${activeDateFilter === 'custom' ? 'active' : ''}`}
+                            onClick={() => setDateRangeFilter('custom')}
+                        >
+                            Custom
+                        </button>
+                    </div>
+                    {showCustomDatePicker && (
+                        <div className="custom-date-picker-wrapper">
+                            <DatePicker
+                                selectsRange={true}
+                                startDate={startDate}
+                                endDate={endDate}
+                                onChange={(update) => {
+                                    setDateRange(update);
+                                    if (update[0] && update[1]) {
+                                        setShowCustomDatePicker(false);
+                                        setActiveDateFilter('custom');
+                                    }
+                                }}
+                                isClearable={true}
+                                className="custom-date-picker"
+                                placeholderText="Select date range"
+                            />
+                            <button
+                                className="close-date-picker"
+                                onClick={() => setShowCustomDatePicker(false)}
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -410,7 +592,7 @@ const Dashboard = () => {
                     </div>
                     <div className="stat-info">
                         <h3>Total Inspections</h3>
-                        <p className="stat-value">{totalInspections}</p>
+                        <p className="stat-value">{dashboardMetrics.totalInspections}</p>
                     </div>
                 </div>
                 <div className="stat-card">
@@ -419,7 +601,7 @@ const Dashboard = () => {
                     </div>
                     <div className="stat-info">
                         <h3>Average Score</h3>
-                        <p className="stat-value">{avgScore}%</p>
+                        <p className="stat-value">{dashboardMetrics.averageScore}%</p>
                     </div>
                 </div>
                 <div className="stat-card">
@@ -428,7 +610,7 @@ const Dashboard = () => {
                     </div>
                     <div className="stat-info">
                         <h3>Open Issues</h3>
-                        <p className="stat-value">{openTickets}</p>
+                        <p className="stat-value">{dashboardMetrics.openIssues}</p>
                     </div>
                 </div>
                 <div className="stat-card">
@@ -437,7 +619,7 @@ const Dashboard = () => {
                     </div>
                     <div className="stat-info">
                         <h3>Resolved Issues</h3>
-                        <p className="stat-value">{resolvedTickets}</p>
+                        <p className="stat-value">{dashboardMetrics.resolvedIssues}</p>
                     </div>
                 </div>
                 <div className="stat-card">
@@ -447,7 +629,7 @@ const Dashboard = () => {
                     <div className="stat-info">
                         <h3>Avg APPA Score</h3>
                         <p className="stat-value">
-                            {avgScore >= 90 ? '1' : avgScore >= 80 ? '2' : avgScore >= 70 ? '3' : avgScore >= 60 ? '4' : '5'}
+                            {dashboardMetrics.avgAppaScore}
                             <span className="text-xs text-muted font-normal ml-1">(Level)</span>
                         </p>
                     </div>
@@ -459,13 +641,7 @@ const Dashboard = () => {
                     <div className="stat-info">
                         <h3>Avg Response Time</h3>
                         <p className="stat-value">
-                            {filteredTickets.filter(t => t.firstResponseAt).length > 0
-                                ? Math.round(filteredTickets.filter(t => t.firstResponseAt).reduce((acc, curr) => {
-                                    const created = new Date(curr.createdAt);
-                                    const responded = new Date(curr.firstResponseAt);
-                                    return acc + (responded - created);
-                                }, 0) / filteredTickets.filter(t => t.firstResponseAt).length / (1000 * 60 * 60))
-                                : 0}
+                            {dashboardMetrics.avgResponseTime}
                             <span className="text-xs text-muted font-normal ml-1">hrs</span>
                         </p>
                     </div>
@@ -474,41 +650,63 @@ const Dashboard = () => {
 
             <div className="charts-grid">
                 <div className="chart-card">
-                    <h3>Inspections Over Time</h3>
+                    <h3>Inspections Performed</h3>
                     <div className="chart-container">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={inspectionChartData}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="date" />
-                                <YAxis allowDecimals={false} />
-                                <Tooltip />
-                                <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                            </BarChart>
-                        </ResponsiveContainer>
+                        {formattedInspectionsData.length > 0 ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={formattedInspectionsData}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="date" />
+                                    <YAxis allowDecimals={false} />
+                                    <Tooltip 
+                                        content={({ active, payload }) => {
+                                            if (active && payload && payload.length) {
+                                                return (
+                                                    <div className="chart-tooltip">
+                                                        <p>{payload[0].payload.fullDate}</p>
+                                                        <p><strong>{payload[0].value}</strong> inspections</p>
+                                                    </div>
+                                                );
+                                            }
+                                            return null;
+                                        }}
+                                    />
+                                    <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="chart-empty">No data available for selected period</div>
+                        )}
                     </div>
                 </div>
                 <div className="chart-card">
-                    <h3>Ticket Status Distribution</h3>
+                    <h3>Tickets Created</h3>
                     <div className="chart-container">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie
-                                    data={ticketStatusData}
-                                    cx="50%"
-                                    cy="50%"
-                                    labelLine={false}
-                                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                                    outerRadius={80}
-                                    fill="#8884d8"
-                                    dataKey="value"
-                                >
-                                    {ticketStatusData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.color} />
-                                    ))}
-                                </Pie>
-                                <Tooltip />
-                            </PieChart>
-                        </ResponsiveContainer>
+                        {formattedTicketsData.length > 0 ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={formattedTicketsData}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="date" />
+                                    <YAxis allowDecimals={false} />
+                                    <Tooltip 
+                                        content={({ active, payload }) => {
+                                            if (active && payload && payload.length) {
+                                                return (
+                                                    <div className="chart-tooltip">
+                                                        <p>{payload[0].payload.fullDate}</p>
+                                                        <p><strong>{payload[0].value}</strong> tickets</p>
+                                                    </div>
+                                                );
+                                            }
+                                            return null;
+                                        }}
+                                    />
+                                    <Bar dataKey="count" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="chart-empty">No data available for selected period</div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -517,9 +715,20 @@ const Dashboard = () => {
                 .dashboard-container { max-width: 1200px; margin: 0 auto; padding: 20px; }
                 .dashboard-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
                 .subtitle { color: var(--text-muted); margin: 5px 0 0 0; }
-                .date-filter { display: flex; align-items: center; gap: 10px; background: white; padding: 10px 16px; border-radius: 8px; box-shadow: var(--shadow-sm); }
-                .calendar-icon { color: var(--text-muted); }
-                .date-picker-input { border: none; outline: none; font-size: 14px; }
+                
+                .filters-section { background: white; padding: 20px; border-radius: 12px; box-shadow: var(--shadow-sm); margin-bottom: 30px; }
+                .filter-group { margin-bottom: 15px; }
+                .filter-group:last-child { margin-bottom: 0; }
+                .filter-label { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--text-dark); margin-bottom: 10px; }
+                .location-filter { width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; background: white; }
+                .date-filter-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+                .date-filter-btn { padding: 8px 16px; border: 1px solid #e2e8f0; border-radius: 6px; background: white; font-size: 13px; font-weight: 500; color: var(--text-dark); cursor: pointer; transition: all 0.2s; }
+                .date-filter-btn:hover { background: #f8fafc; border-color: #cbd5e1; }
+                .date-filter-btn.active { background: #3b82f6; color: white; border-color: #3b82f6; }
+                .custom-date-picker-wrapper { margin-top: 12px; display: flex; align-items: center; gap: 10px; padding: 12px; background: #f8fafc; border-radius: 8px; }
+                .custom-date-picker { padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 14px; }
+                .close-date-picker { padding: 6px; border: none; background: transparent; cursor: pointer; color: var(--text-muted); }
+                .close-date-picker:hover { color: var(--text-dark); }
                 
                 .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 30px; }
                 .stat-card { background: white; padding: 20px; border-radius: 12px; box-shadow: var(--shadow-sm); display: flex; align-items: center; gap: 15px; }
@@ -532,13 +741,21 @@ const Dashboard = () => {
                 .text-red-600 { color: #dc2626; }
                 .bg-purple-100 { background: #f3e8ff; }
                 .text-purple-600 { color: #9333ea; }
+                .bg-amber-100 { background: #fef3c7; }
+                .text-amber-600 { color: #d97706; }
+                .bg-indigo-100 { background: #e0e7ff; }
+                .text-indigo-600 { color: #4f46e5; }
                 .stat-info h3 { margin: 0 0 5px 0; font-size: 14px; color: var(--text-muted); }
                 .stat-value { margin: 0; font-size: 24px; font-weight: 700; color: var(--text-dark); }
                 
                 .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 20px; }
                 .chart-card { background: white; padding: 24px; border-radius: 12px; box-shadow: var(--shadow-sm); }
-                .chart-card h3 { margin: 0 0 20px 0; font-size: 16px; }
+                .chart-card h3 { margin: 0 0 20px 0; font-size: 16px; font-weight: 600; }
                 .chart-container { height: 300px; }
+                .chart-empty { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); font-style: italic; }
+                .chart-tooltip { background: white; padding: 10px; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+                .chart-tooltip p { margin: 4px 0; font-size: 12px; }
+                .chart-tooltip p strong { font-size: 14px; }
             `}</style>
         </div>
     );

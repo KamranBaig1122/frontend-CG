@@ -2,8 +2,10 @@ import { useState, useEffect, useContext } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import AuthContext from '../context/AuthContext';
+import { apiBaseUrl } from '../config/api';
 import { ArrowLeft, Download, Calendar, User } from 'lucide-react';
 import toast from 'react-hot-toast';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 const InspectionDetails = () => {
     const { id } = useParams();
@@ -20,7 +22,7 @@ const InspectionDetails = () => {
                 const config = {
                     headers: { Authorization: `Bearer ${user.token}` },
                 };
-                const { data } = await axios.get(`http://localhost:5000/api/inspections/${id}`, config);
+                const { data } = await axios.get(`${apiBaseUrl}/inspections/${id}`, config);
                 setInspection(data);
                 setLoading(false);
             } catch (error) {
@@ -38,7 +40,7 @@ const InspectionDetails = () => {
                 headers: { Authorization: `Bearer ${user.token}` },
                 responseType: 'blob',
             };
-            const { data } = await axios.get(`http://localhost:5000/api/inspections/${id}/pdf`, config);
+            const { data } = await axios.get(`${apiBaseUrl}/inspections/${id}/pdf`, config);
 
             const url = window.URL.createObjectURL(new Blob([data]));
             const link = document.createElement('a');
@@ -104,8 +106,26 @@ const InspectionDetails = () => {
         setShowBulkModal(false);
     };
 
-    if (loading) return <div className="p-8 text-center">Loading details...</div>;
-    if (!inspection) return <div className="p-8 text-center">Inspection not found</div>;
+    if (loading) return <LoadingSpinner message="Loading inspection details..." type="three-dots" color="#3b82f6" height={60} width={60} />;
+    if (!inspection) return (
+        <div className="fade-in" style={{ textAlign: 'center', padding: '60px 20px' }}>
+            <div style={{
+                background: 'white',
+                padding: '40px',
+                borderRadius: '12px',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                maxWidth: '500px',
+                margin: '0 auto'
+            }}>
+                <h2 style={{ color: '#ef4444', marginBottom: '12px' }}>Inspection Not Found</h2>
+                <p style={{ color: '#64748b', marginBottom: '24px' }}>The inspection you're looking for doesn't exist or has been removed.</p>
+                <Link to="/inspections" className="btn" style={{ display: 'inline-block' }}>
+                    <ArrowLeft size={18} style={{ marginRight: '8px', display: 'inline' }} />
+                    Back to Inspections
+                </Link>
+            </div>
+        </div>
+    );
 
     return (
         <div className="details-container">

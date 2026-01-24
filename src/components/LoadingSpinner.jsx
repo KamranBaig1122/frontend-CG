@@ -1,10 +1,41 @@
-import { Loader2 } from 'lucide-react';
+import { ThreeDots, TailSpin, Grid, Puff, Rings } from 'react-loader-spinner';
 
-const LoadingSpinner = ({ size = 40, message = 'Loading...' }) => {
+const LoadingSpinner = ({ 
+    size = 40, 
+    message = 'Loading...', 
+    type = 'three-dots',
+    color = '#3b82f6',
+    height = 80,
+    width = 80
+}) => {
+    const renderSpinner = () => {
+        const commonProps = {
+            color: color,
+            height: height,
+            width: width,
+            visible: true
+        };
+
+        switch (type) {
+            case 'three-dots':
+                return <ThreeDots {...commonProps} radius="9" />;
+            case 'tail-spin':
+                return <TailSpin {...commonProps} radius="1" />;
+            case 'grid':
+                return <Grid {...commonProps} radius="9" />;
+            case 'puff':
+                return <Puff {...commonProps} radius="1" />;
+            case 'rings':
+                return <Rings {...commonProps} radius="6" />;
+            default:
+                return <ThreeDots {...commonProps} radius="9" />;
+        }
+    };
+
     return (
         <div className="loading-container">
             <div className="spinner-wrapper">
-                <Loader2 className="spinner-icon" size={size} />
+                {renderSpinner()}
             </div>
             {message && <p className="loading-text">{message}</p>}
             <style>{`
@@ -13,28 +44,29 @@ const LoadingSpinner = ({ size = 40, message = 'Loading...' }) => {
                     flex-direction: column;
                     align-items: center;
                     justify-content: center;
-                    padding: 40px;
-                    min-height: 200px;
+                    padding: 60px 40px;
+                    min-height: 300px;
                     width: 100%;
+                    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+                    border-radius: 12px;
                 }
                 .spinner-wrapper {
-                    color: var(--primary-color);
-                    animation: spin 1s linear infinite;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin-bottom: 20px;
                 }
                 .loading-text {
-                    margin-top: 16px;
+                    margin-top: 20px;
                     color: var(--text-muted);
-                    font-size: 14px;
+                    font-size: 16px;
                     font-weight: 500;
                     animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-                }
-                @keyframes spin {
-                    from { transform: rotate(0deg); }
-                    to { transform: rotate(360deg); }
+                    text-align: center;
                 }
                 @keyframes pulse {
                     0%, 100% { opacity: 1; }
-                    50% { opacity: .5; }
+                    50% { opacity: .6; }
                 }
             `}</style>
         </div>

@@ -1,7 +1,7 @@
 import { useContext } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import AuthContext from '../context/AuthContext';
-import { Home, ClipboardList, AlertCircle, Menu, LogOut, MapPin, FileText, Users, BarChart2, Calendar } from 'lucide-react';
+import { Home, ClipboardList, AlertCircle, Menu, LogOut, MapPin, FileText, Users, BarChart2, Calendar, Play } from 'lucide-react';
 
 const Layout = ({ children }) => {
   const { user, logout } = useContext(AuthContext);
@@ -32,6 +32,10 @@ const Layout = ({ children }) => {
           <NavLink to="/schedule" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
             <Calendar size={20} />
             <span>Schedule</span>
+          </NavLink>
+          <NavLink to="/start-work" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+            <Play size={20} />
+            <span>Start Work</span>
           </NavLink>
           <NavLink to="/more" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
             <Menu size={20} />
@@ -81,6 +85,10 @@ const Layout = ({ children }) => {
         <NavLink to="/tickets" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
           <AlertCircle size={24} />
           <span>Tickets</span>
+        </NavLink>
+        <NavLink to="/start-work" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+          <Play size={24} />
+          <span>Work</span>
         </NavLink>
         <NavLink to="/more" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
           <Menu size={24} />

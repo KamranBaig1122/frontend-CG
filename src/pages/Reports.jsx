@@ -1,212 +1,216 @@
-import { useState, useContext } from 'react';
-import axios from 'axios';
-import AuthContext from '../context/AuthContext';
-import DatePicker from 'react-datepicker';
-import "react-datepicker/dist/react-datepicker.css";
-import { FileText, Calendar, Download, AlertCircle, CheckCircle, BarChart3, ClipboardList } from 'lucide-react';
-import toast from 'react-hot-toast';
-import LoadingSpinner from '../components/LoadingSpinner';
+import { Link } from 'react-router-dom';
+import { FileText, BarChart3, AlertCircle, Trophy, Lock, ClipboardList, ArrowRight } from 'lucide-react';
 
 const Reports = () => {
-    const { user } = useContext(AuthContext);
-    const [dateRange, setDateRange] = useState([new Date(new Date().setDate(new Date().getDate() - 30)), new Date()]);
-    const [startDate, endDate] = dateRange;
-    const [reportType, setReportType] = useState('all');
-    const [loading, setLoading] = useState(false);
 
-    const handleGenerateReport = async () => {
-        if (!startDate || !endDate) {
-            toast.error('Please select a date range');
-            return;
+    const reportTypes = [
+        {
+            id: 'overall',
+            title: 'Overall Report',
+            description: 'How is my organization doing? What are our lowest-performing locations?',
+            icon: <BarChart3 size={32} />,
+            color: 'from-blue-500 to-cyan-500',
+            route: '/reports/overall'
+        },
+        {
+            id: 'tickets',
+            title: 'Tickets Report',
+            description: 'How responsive is my team? Which locations have the most complaints?',
+            icon: <AlertCircle size={32} />,
+            color: 'from-red-500 to-pink-500',
+            route: '/reports/tickets'
+        },
+        {
+            id: 'inspectors',
+            title: 'Inspector Leaderboard',
+            description: 'How many inspections is my team performing? What kind of scores do my inspectors tend to give?',
+            icon: <Trophy size={32} />,
+            color: 'from-yellow-500 to-orange-500',
+            route: '/reports/inspectors'
+        },
+        {
+            id: 'private',
+            title: 'Private Inspections Report',
+            description: 'How is my team doing internally?',
+            icon: <Lock size={32} />,
+            color: 'from-purple-500 to-indigo-500',
+            route: '/reports/private-inspections'
+        },
+        {
+            id: 'forms',
+            title: 'Inspection Forms Report',
+            description: 'Which area types do we need to improve? What are the lowest-performing line items for each area type?',
+            icon: <ClipboardList size={32} />,
+            color: 'from-green-500 to-emerald-500',
+            route: '/reports/inspection-forms'
         }
+    ];
 
-        setLoading(true);
-        try {
-            const config = {
-                headers: { Authorization: `Bearer ${user.token}` },
-                responseType: 'blob',
-                params: {
-                    startDate: startDate.toISOString(),
-                    endDate: endDate.toISOString(),
-                    type: reportType
-                }
-            };
-
-            const response = await axios.get('http://localhost:5000/api/reports/summary', config);
-
-            const url = window.URL.createObjectURL(new Blob([response.data]));
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `summary-report-${new Date().toISOString().split('T')[0]}.pdf`);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-
-            toast.success('Report generated successfully!');
-        } catch (error) {
-            console.error(error);
-            toast.error('Failed to generate report');
-        } finally {
-            setLoading(false);
-        }
+    const gradientColors = {
+        'overall': 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+        'tickets': 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+        'inspectors': 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+        'private': 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+        'forms': 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
     };
 
     return (
-        <div className="fade-in max-w-5xl mx-auto px-4 py-8">
-            <div className="page-header mb-8">
+        <div className="fade-in">
+            <div className="page-header" style={{ 
+                marginBottom: '40px',
+                padding: '32px',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                borderRadius: '16px',
+                color: 'white',
+                boxShadow: '0 10px 25px -5px rgba(102, 126, 234, 0.4)'
+            }}>
                 <div>
-                    <h1>Reports Center</h1>
-                    <p className="text-muted mt-1">Generate and download detailed performance summaries.</p>
+                    <h1 style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '16px',
+                        margin: 0,
+                        fontSize: '36px',
+                        fontWeight: '700'
+                    }}>
+                        <div style={{
+                            width: '56px',
+                            height: '56px',
+                            borderRadius: '14px',
+                            background: 'rgba(255, 255, 255, 0.2)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backdropFilter: 'blur(10px)'
+                        }}>
+                            <FileText size={32} />
+                        </div>
+                        Reports
+                    </h1>
+                    <p style={{ 
+                        margin: '12px 0 0 0', 
+                        opacity: 0.95, 
+                        fontSize: '17px',
+                        fontWeight: '400'
+                    }}>
+                        Generate detailed performance reports and analytics
+                    </p>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Control Panel */}
-                <div className="lg:col-span-2 space-y-8">
-                    <div className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-xl shadow-slate-200/50">
-                        {/* Decorative Gradient Top */}
-                        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
-
-                        <div className="p-8">
-                            <div className="flex items-center gap-4 mb-8">
-                                <div className="p-3.5 bg-indigo-50 text-indigo-600 rounded-2xl shadow-sm ring-1 ring-indigo-100">
-                                    <FileText size={28} />
-                                </div>
-                                <div>
-                                    <h2 className="text-xl font-bold text-slate-800">Report Configuration</h2>
-                                    <p className="text-slate-500">Customize parameters to generate your PDF</p>
-                                </div>
+            <div className="grid-cards" style={{ 
+                gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', 
+                gap: '28px' 
+            }}>
+                {reportTypes.map((report) => (
+                    <Link
+                        key={report.id}
+                        to={report.route}
+                        className="card"
+                        style={{
+                            textDecoration: 'none',
+                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                            cursor: 'pointer',
+                            border: '1px solid #e2e8f0',
+                            background: 'white',
+                            borderRadius: '16px',
+                            overflow: 'hidden',
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
+                            e.currentTarget.style.boxShadow = '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                            e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
+                        }}
+                    >
+                        <div style={{
+                            background: gradientColors[report.id] || 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                            padding: '32px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            position: 'relative',
+                            overflow: 'hidden'
+                        }}>
+                            <div style={{
+                                position: 'absolute',
+                                top: '-50%',
+                                right: '-50%',
+                                width: '200%',
+                                height: '200%',
+                                background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)',
+                                animation: 'pulse 3s ease-in-out infinite'
+                            }}></div>
+                            <div style={{ 
+                                color: 'white',
+                                position: 'relative',
+                                zIndex: 1,
+                                transform: 'scale(1.1)'
+                            }}>
+                                {report.icon}
                             </div>
-
-                            <div className="space-y-8">
-                                {/* Date Selection */}
-                                <div className="bg-slate-50/50 p-6 rounded-2xl border border-slate-100">
-                                    <label className="flex items-center gap-2 text-sm font-bold text-slate-700 mb-4">
-                                        <Calendar size={16} className="text-indigo-500" />
-                                        Select Date Range
-                                    </label>
-                                    <div className="relative group max-w-md">
-                                        <DatePicker
-                                            selectsRange={true}
-                                            startDate={startDate}
-                                            endDate={endDate}
-                                            onChange={(update) => setDateRange(update)}
-                                            className="w-full p-4 pl-12 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-medium text-slate-700 shadow-sm group-hover:border-indigo-300 cursor-pointer"
-                                            placeholderText="Select start and end date"
-                                            dateFormat="MMM d, yyyy"
-                                        />
-                                        <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-indigo-500 transition-colors pointer-events-none" size={20} />
-                                    </div>
-                                </div>
-
-                                {/* Report Type Selection */}
-                                <div>
-                                    <label className="flex items-center gap-2 text-sm font-bold text-slate-700 mb-4">
-                                        <FileText size={16} className="text-indigo-500" />
-                                        Report Type
-                                    </label>
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                        {[
-                                            { id: 'all', label: 'All Data', sub: 'Full Overview', icon: <BarChart3 size={24} /> },
-                                            { id: 'inspections', label: 'Inspections', sub: 'Quality Scores', icon: <ClipboardList size={24} /> },
-                                            { id: 'tickets', label: 'Tickets', sub: 'Issue Tracking', icon: <AlertCircle size={24} /> }
-                                        ].map((type) => (
-                                            <button
-                                                key={type.id}
-                                                onClick={() => setReportType(type.id)}
-                                                className={`relative group p-5 rounded-xl border-2 text-left transition-all duration-300 ${reportType === type.id
-                                                    ? 'border-indigo-600 bg-indigo-50/50 shadow-lg shadow-indigo-100 scale-[1.02] ring-1 ring-indigo-600/20'
-                                                    : 'border-slate-100 bg-white hover:border-indigo-200 hover:shadow-md hover:-translate-y-0.5'
-                                                    }`}
-                                            >
-                                                {reportType === type.id && (
-                                                    <div className="absolute -top-2 -right-2 bg-indigo-600 text-white p-1 rounded-full shadow-md animate-in zoom-in duration-200">
-                                                        <CheckCircle size={14} strokeWidth={3} />
-                                                    </div>
-                                                )}
-                                                <div className={`mb-3 transition-colors duration-300 ${reportType === type.id ? 'text-indigo-600' : 'text-slate-400 group-hover:text-indigo-500'}`}>
-                                                    {type.icon}
-                                                </div>
-                                                <div className={`font-bold text-lg mb-1 ${reportType === type.id ? 'text-indigo-900' : 'text-slate-700'}`}>
-                                                    {type.label}
-                                                </div>
-                                                <div className={`text-xs font-medium ${reportType === type.id ? 'text-indigo-600' : 'text-slate-400'}`}>
-                                                    {type.sub}
-                                                </div>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Action Button */}
-                                <div className="pt-4">
-                                    <button
-                                        onClick={handleGenerateReport}
-                                        disabled={loading || !startDate || !endDate}
-                                        className={`btn w-full py-4 text-lg font-bold rounded-xl shadow-xl shadow-indigo-200 transition-all duration-300 ${loading
-                                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none'
-                                            : 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:shadow-2xl hover:shadow-indigo-300 hover:-translate-y-1 active:scale-[0.98]'
-                                            }`}
-                                    >
-                                        {loading ? (
-                                            <div className="flex items-center justify-center gap-3">
-                                                <LoadingSpinner size="sm" color="current" />
-                                                <span>Generating Report...</span>
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-center justify-center gap-3">
-                                                <Download size={24} />
-                                                <span>Generate PDF Report</span>
-                                            </div>
-                                        )}
-                                    </button>
+                        </div>
+                        <div style={{ padding: '24px' }}>
+                            <h2 style={{ 
+                                marginBottom: '12px', 
+                                fontSize: '22px', 
+                                fontWeight: '700', 
+                                color: '#1e293b',
+                                lineHeight: '1.3'
+                            }}>
+                                {report.title}
+                            </h2>
+                            <p style={{ 
+                                color: '#64748b', 
+                                marginBottom: '24px', 
+                                lineHeight: '1.7', 
+                                fontSize: '15px',
+                                minHeight: '48px'
+                            }}>
+                                {report.description}
+                            </p>
+                            <div style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'space-between', 
+                                paddingTop: '20px', 
+                                borderTop: '2px solid #f1f5f9',
+                                marginTop: 'auto'
+                            }}>
+                                <span style={{ 
+                                    fontSize: '15px', 
+                                    fontWeight: '600', 
+                                    color: '#3b82f6',
+                                    letterSpacing: '0.3px'
+                                }}>
+                                    View Report
+                                </span>
+                                <div style={{
+                                    width: '36px',
+                                    height: '36px',
+                                    borderRadius: '8px',
+                                    background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: 'white',
+                                    transition: 'transform 0.2s'
+                                }}>
+                                    <ArrowRight size={18} />
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </div>
-
-                {/* Info Panel */}
-                <div className="space-y-6">
-                    <div className="card bg-gradient-to-br from-indigo-600 to-violet-600 text-white border-none">
-                        <h3 className="font-bold text-lg mb-2 flex items-center gap-2">
-                            <CheckCircle size={20} className="text-indigo-200" /> Pro Tip
-                        </h3>
-                        <p className="text-indigo-100 text-sm leading-relaxed">
-                            Generate reports at the end of each week to track team performance trends. Use the "All Data" report for executive summaries.
-                        </p>
-                    </div>
-
-                    <div className="card">
-                        <h3 className="font-bold text-slate-800 mb-4">Report Contents</h3>
-                        <ul className="space-y-3">
-                            <li className="flex items-start gap-3 text-sm text-slate-600">
-                                <div className="mt-1 min-w-[6px] h-[6px] rounded-full bg-indigo-500"></div>
-                                <span><strong>Executive Summary:</strong> High-level statistics and KPIs.</span>
-                            </li>
-                            <li className="flex items-start gap-3 text-sm text-slate-600">
-                                <div className="mt-1 min-w-[6px] h-[6px] rounded-full bg-emerald-500"></div>
-                                <span><strong>Performance Metrics:</strong> Average scores and pass rates.</span>
-                            </li>
-                            <li className="flex items-start gap-3 text-sm text-slate-600">
-                                <div className="mt-1 min-w-[6px] h-[6px] rounded-full bg-amber-500"></div>
-                                <span><strong>Issue Tracking:</strong> Detailed breakdown of reported tickets.</span>
-                            </li>
-                            <li className="flex items-start gap-3 text-sm text-slate-600">
-                                <div className="mt-1 min-w-[6px] h-[6px] rounded-full bg-slate-400"></div>
-                                <span><strong>Activity Logs:</strong> Chronological list of all actions.</span>
-                            </li>
-                            <li className="flex items-start gap-3 text-sm text-slate-600">
-                                <div className="mt-1 min-w-[6px] h-[6px] rounded-full bg-amber-500"></div>
-                                <span><strong>APPA Scores:</strong> Cleanliness levels (1-5).</span>
-                            </li>
-                            <li className="flex items-start gap-3 text-sm text-slate-600">
-                                <div className="mt-1 min-w-[6px] h-[6px] rounded-full bg-indigo-500"></div>
-                                <span><strong>Response Time:</strong> Avg time to address tickets.</span>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
+                        <style>{`
+                            @keyframes pulse {
+                                0%, 100% { opacity: 0.3; }
+                                50% { opacity: 0.6; }
+                            }
+                        `}</style>
+                    </Link>
+                ))}
             </div>
         </div>
     );

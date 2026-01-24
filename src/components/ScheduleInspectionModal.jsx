@@ -1,6 +1,7 @@
 import { useState, useContext } from 'react';
 import axios from 'axios';
 import AuthContext from '../context/AuthContext';
+import { apiBaseUrl } from '../config/api';
 import toast from 'react-hot-toast';
 import { X, Calendar } from 'lucide-react';
 
@@ -19,7 +20,7 @@ const ScheduleInspectionModal = ({ inspection, onClose, onSuccess }) => {
             const config = {
                 headers: { Authorization: `Bearer ${user.token}` },
             };
-            await axios.patch(`http://localhost:5000/api/inspections/${inspection._id}/schedule`,
+            await axios.patch(`${apiBaseUrl}/inspections/${inspection._id}/schedule`,
                 { scheduledDate },
                 config
             );
@@ -44,6 +45,11 @@ const ScheduleInspectionModal = ({ inspection, onClose, onSuccess }) => {
 
                 <form onSubmit={handleSubmit}>
                     <div className="modal-body">
+                        {loading && (
+                            <div style={{ marginBottom: '16px', padding: '16px', background: '#f8fafc', borderRadius: '8px', textAlign: 'center' }}>
+                                <LoadingSpinner message="Scheduling inspection..." type="tail-spin" color="#3b82f6" height={30} width={30} />
+                            </div>
+                        )}
                         <p className="inspection-title">Location: {inspection.location?.name}</p>
                         <div className="form-group">
                             <label>Scheduled Date & Time</label>
@@ -53,16 +59,22 @@ const ScheduleInspectionModal = ({ inspection, onClose, onSuccess }) => {
                                 value={scheduledDate}
                                 onChange={(e) => setScheduledDate(e.target.value)}
                                 required
+                                disabled={loading}
                             />
                         </div>
                     </div>
 
                     <div className="modal-footer">
-                        <button type="button" className="btn btn-secondary" onClick={onClose}>
+                        <button type="button" className="btn btn-secondary" onClick={onClose} disabled={loading}>
                             Cancel
                         </button>
                         <button type="submit" className="btn btn-primary" disabled={loading}>
-                            {loading ? 'Scheduling...' : 'Schedule Inspection'}
+                            {loading ? (
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <LoadingSpinner type="tail-spin" color="white" height={16} width={16} />
+                                    Scheduling...
+                                </span>
+                            ) : 'Schedule Inspection'}
                         </button>
                     </div>
                 </form>

@@ -2,8 +2,10 @@ import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import AuthContext from '../context/AuthContext';
+import { apiBaseUrl } from '../config/api';
 import toast from 'react-hot-toast';
 import { Building2, Plus, Pencil, Trash2 } from 'lucide-react';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 const LocationManagement = () => {
     const { user } = useContext(AuthContext);
@@ -29,7 +31,7 @@ const LocationManagement = () => {
     const fetchLocations = async () => {
         try {
             const config = { headers: { Authorization: `Bearer ${user.token}` } };
-            const { data } = await axios.get('http://localhost:5000/api/locations', config);
+            const { data } = await axios.get(`${apiBaseUrl}/locations`, config);
             setLocations(data);
             setLoading(false);
         } catch (error) {
@@ -44,10 +46,10 @@ const LocationManagement = () => {
         try {
             const config = { headers: { Authorization: `Bearer ${user.token}` } };
             if (editingLocation) {
-                await axios.put(`http://localhost:5000/api/locations/${editingLocation._id}`, formData, config);
+                await axios.put(`${apiBaseUrl}/locations/${editingLocation._id}`, formData, config);
                 toast.success('Location updated successfully');
             } else {
-                await axios.post('http://localhost:5000/api/locations', formData, config);
+                await axios.post(`${apiBaseUrl}/locations`, formData, config);
                 toast.success('Location created successfully');
             }
             setShowForm(false);
@@ -74,7 +76,7 @@ const LocationManagement = () => {
         if (!window.confirm('Are you sure you want to delete this location?')) return;
         try {
             const config = { headers: { Authorization: `Bearer ${user.token}` } };
-            await axios.delete(`http://localhost:5000/api/locations/${id}`, config);
+            await axios.delete(`${apiBaseUrl}/locations/${id}`, config);
             toast.success('Location deleted successfully');
             fetchLocations();
         } catch (error) {
@@ -83,7 +85,7 @@ const LocationManagement = () => {
         }
     };
 
-    if (loading) return <div className="p-8 text-center">Loading...</div>;
+    if (loading) return <LoadingSpinner message="Loading locations..." type="three-dots" color="#3b82f6" height={60} width={60} />;
 
     return (
         <div className="location-management">

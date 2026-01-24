@@ -2,6 +2,7 @@ import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import AuthContext from '../context/AuthContext';
+import { apiBaseUrl } from '../config/api';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { CheckCircle, AlertTriangle, Camera, ArrowRight, ArrowLeft } from 'lucide-react';
@@ -26,8 +27,8 @@ const InspectionWizard = () => {
                     headers: { Authorization: `Bearer ${user.token}` },
                 };
                 console.log('Fetching data...');
-                const locRes = await axios.get('http://localhost:5000/api/locations', config);
-                const tempRes = await axios.get('http://localhost:5000/api/templates', config);
+                const locRes = await axios.get(`${apiBaseUrl}/locations`, config);
+                const tempRes = await axios.get(`${apiBaseUrl}/templates`, config);
                 console.log('Locations:', locRes.data);
                 console.log('Templates:', tempRes.data);
                 setLocations(locRes.data);
@@ -102,7 +103,7 @@ const InspectionWizard = () => {
                 summaryComment: 'Inspection completed via Wizard'
             };
 
-            await axios.post('http://localhost:5000/api/inspections', payload, config);
+            await axios.post(`${apiBaseUrl}/inspections`, payload, config);
             toast.success('Inspection submitted successfully!');
             navigate('/');
         } catch (error) {

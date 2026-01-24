@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import axios from 'axios';
+import { apiBaseUrl } from '../config/api';
 import toast from 'react-hot-toast';
 import { X, Upload, CheckCircle } from 'lucide-react';
+import LoadingSpinner from './LoadingSpinner';
 
 const ResolveTicketModal = ({ ticket, user, onClose, onSuccess }) => {
     const [resolutionNotes, setResolutionNotes] = useState('');
@@ -46,7 +48,7 @@ const ResolveTicketModal = ({ ticket, user, onClose, onSuccess }) => {
             const imageData = resolutionImages.map(img => img.preview);
 
             // Update ticket with resolution data
-            await axios.put(`http://localhost:5000/api/tickets/${ticket._id}`, {
+            await axios.put(`${apiBaseUrl}/tickets/${ticket._id}`, {
                 title: ticket.title,
                 description: ticket.description,
                 location: ticket.location._id || ticket.location,
@@ -130,13 +132,23 @@ const ResolveTicketModal = ({ ticket, user, onClose, onSuccess }) => {
                         )}
                     </div>
 
+                    {loading && (
+                        <div style={{ padding: '16px', background: '#f8fafc', borderRadius: '8px', textAlign: 'center', marginBottom: '16px' }}>
+                            <LoadingSpinner message="Resolving ticket..." type="tail-spin" color="#10b981" height={30} width={30} />
+                        </div>
+                    )}
                     <div className="modal-actions">
-                        <button type="button" className="btn btn-secondary" onClick={onClose}>
+                        <button type="button" className="btn btn-secondary" onClick={onClose} disabled={loading}>
                             Cancel
                         </button>
                         <button type="submit" className="btn btn-success" disabled={loading}>
                             <CheckCircle size={18} />
-                            {loading ? 'Resolving...' : 'Resolve Ticket'}
+                            {loading ? (
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <LoadingSpinner type="tail-spin" color="white" height={16} width={16} />
+                                    Resolving...
+                                </span>
+                            ) : 'Resolve Ticket'}
                         </button>
                     </div>
                 </form>

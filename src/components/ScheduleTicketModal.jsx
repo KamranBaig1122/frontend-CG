@@ -1,8 +1,10 @@
 import { useState, useContext } from 'react';
 import axios from 'axios';
 import AuthContext from '../context/AuthContext';
+import { apiBaseUrl } from '../config/api';
 import toast from 'react-hot-toast';
 import { X, Calendar } from 'lucide-react';
+import LoadingSpinner from './LoadingSpinner';
 
 const ScheduleTicketModal = ({ ticket, onClose, onSuccess }) => {
     const { user } = useContext(AuthContext);
@@ -19,7 +21,7 @@ const ScheduleTicketModal = ({ ticket, onClose, onSuccess }) => {
             const config = {
                 headers: { Authorization: `Bearer ${user.token}` },
             };
-            await axios.patch(`http://localhost:5000/api/tickets/${ticket._id}/schedule`,
+            await axios.patch(`${apiBaseUrl}/tickets/${ticket._id}/schedule`,
                 { scheduledDate },
                 config
             );
@@ -44,6 +46,11 @@ const ScheduleTicketModal = ({ ticket, onClose, onSuccess }) => {
 
                 <form onSubmit={handleSubmit}>
                     <div className="modal-body">
+                        {loading && (
+                            <div style={{ marginBottom: '16px', padding: '16px', background: '#f8fafc', borderRadius: '8px', textAlign: 'center' }}>
+                                <LoadingSpinner message="Scheduling ticket..." type="tail-spin" color="#3b82f6" height={30} width={30} />
+                            </div>
+                        )}
                         <p className="ticket-title">{ticket.title}</p>
                         <div className="form-group">
                             <label>Scheduled Date & Time</label>
@@ -53,16 +60,22 @@ const ScheduleTicketModal = ({ ticket, onClose, onSuccess }) => {
                                 value={scheduledDate}
                                 onChange={(e) => setScheduledDate(e.target.value)}
                                 required
+                                disabled={loading}
                             />
                         </div>
                     </div>
 
                     <div className="modal-footer">
-                        <button type="button" className="btn btn-secondary" onClick={onClose}>
+                        <button type="button" className="btn btn-secondary" onClick={onClose} disabled={loading}>
                             Cancel
                         </button>
                         <button type="submit" className="btn btn-primary" disabled={loading}>
-                            {loading ? 'Scheduling...' : 'Schedule Ticket'}
+                            {loading ? (
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <LoadingSpinner type="tail-spin" color="white" height={16} width={16} />
+                                    Scheduling...
+                                </span>
+                            ) : 'Schedule Ticket'}
                         </button>
                     </div>
                 </form>

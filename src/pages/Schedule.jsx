@@ -8,6 +8,7 @@ import enUS from 'date-fns/locale/en-US';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import axios from 'axios';
 import AuthContext from '../context/AuthContext';
+import { apiBaseUrl } from '../config/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { Calendar as CalendarIcon, Filter, X } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -27,9 +28,13 @@ const localizer = dateFnsLocalizer({
 const Schedule = () => {
     const { user } = useContext(AuthContext);
     const [events, setEvents] = useState([]);
+    const [allEvents, setAllEvents] = useState([]);
+    const [users, setUsers] = useState([]);
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all'); // 'all', 'my_tasks'
+    const [timePeriod, setTimePeriod] = useState('this_month'); // 'this_week', 'this_month', 'next_week', 'next_month'
+    const [inspectorFilter, setInspectorFilter] = useState('anyone'); // 'anyone', 'me'
 
     useEffect(() => {
         fetchScheduleData();
@@ -38,9 +43,10 @@ const Schedule = () => {
     const fetchScheduleData = async () => {
         try {
             const config = { headers: { Authorization: `Bearer ${user.token}` } };
-            const [inspectionsRes, ticketsRes] = await Promise.all([
-                axios.get('http://localhost:5000/api/inspections', config),
-                axios.get('http://localhost:5000/api/tickets', config)
+            const [inspectionsRes, ticketsRes, usersRes] = await Promise.all([
+                axios.get(`${apiBaseUrl}/inspections`, config),
+                axios.get(`${apiBaseUrl}/tickets`, config),
+                axios.get(`${apiBaseUrl}/users`, config)
             ]);
 
             const inspectionEvents = inspectionsRes.data
@@ -58,12 +64,12 @@ const Schedule = () => {
                 }));
 
             const ticketEvents = ticketsRes.data
-                .filter(t => t.dueDate)
+                .filter(t => t.dueDate || t.scheduledDate)
                 .map(t => ({
                     id: t._id,
                     title: `Ticket: ${t.title}`,
-                    start: new Date(t.dueDate),
-                    end: new Date(new Date(t.dueDate).setHours(new Date(t.dueDate).getHours() + 1)),
+                    start: new Date(t.dueDate || t.scheduledDate),
+                    end: new Date(new Date(t.dueDate || t.scheduledDate).setHours(new Date(t.dueDate || t.scheduledDate).getHours() + 1)),
                     type: 'ticket',
                     status: t.status,
                     assignee: t.assignedTo?._id,
@@ -71,7 +77,10 @@ const Schedule = () => {
                     assigneeName: t.assignedTo?.name
                 }));
 
-            setEvents([...inspectionEvents, ...ticketEvents]);
+            const allEventsData = [...inspectionEvents, ...ticketEvents];
+            setAllEvents(allEventsData);
+            setUsers(usersRes.data);
+            applyFilters(allEventsData);
             setLoading(false);
         } catch (error) {
             console.error(error);
@@ -80,9 +89,72 @@ const Schedule = () => {
         }
     };
 
-    const filteredEvents = filter === 'my_tasks'
-        ? events.filter(e => e.assignee === user._id)
-        : events;
+    const getTimePeriodRange = () => {
+        const now = new Date();
+        let start, end;
+
+        switch (timePeriod) {
+            case 'this_week':
+                start = new Date(now.setDate(now.getDate() - now.getDay()));
+                start.setHours(0, 0, 0, 0);
+                end = new Date(start);
+                end.setDate(end.getDate() + 6);
+                end.setHours(23, 59, 59, 999);
+                break;
+            case 'this_month':
+                start = new Date(now.getFullYear(), now.getMonth(), 1);
+                end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                end.setHours(23, 59, 59, 999);
+                break;
+            case 'next_week':
+                start = new Date(now.setDate(now.getDate() - now.getDay() + 7));
+                start.setHours(0, 0, 0, 0);
+                end = new Date(start);
+                end.setDate(end.getDate() + 6);
+                end.setHours(23, 59, 59, 999);
+                break;
+            case 'next_month':
+                start = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+                end = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+                end.setHours(23, 59, 59, 999);
+                break;
+            default:
+                start = new Date(now.getFullYear(), now.getMonth(), 1);
+                end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                end.setHours(23, 59, 59, 999);
+        }
+
+        return { start, end };
+    };
+
+    const applyFilters = (eventsData = allEvents) => {
+        let filtered = [...eventsData];
+
+        // Time period filter
+        const { start, end } = getTimePeriodRange();
+        filtered = filtered.filter(event => {
+            const eventDate = new Date(event.start);
+            return eventDate >= start && eventDate <= end;
+        });
+
+        // Inspector/Assignee filter
+        if (inspectorFilter === 'me') {
+            filtered = filtered.filter(event => event.assignee === user._id);
+        }
+
+        // Task type filter
+        if (filter === 'my_tasks') {
+            filtered = filtered.filter(event => event.assignee === user._id);
+        }
+
+        setEvents(filtered);
+    };
+
+    useEffect(() => {
+        if (allEvents.length > 0) {
+            applyFilters();
+        }
+    }, [timePeriod, inspectorFilter, filter, user]);
 
     const eventStyleGetter = (event) => {
         let backgroundColor = '#3b82f6'; // Blue for inspections
@@ -113,7 +185,7 @@ const Schedule = () => {
         setSelectedEvent(null);
     };
 
-    if (loading) return <LoadingSpinner message="Loading schedule..." />;
+    if (loading) return <LoadingSpinner message="Loading schedule..." type="three-dots" color="#3b82f6" height={60} width={60} />;
 
     return (
         <div className="schedule-container fade-in">
@@ -122,7 +194,50 @@ const Schedule = () => {
                     <h1><CalendarIcon size={24} /> Schedule</h1>
                     <p className="text-muted">Manage upcoming inspections and ticket due dates</p>
                 </div>
-                <div className="filter-controls">
+                <div className="filter-controls" style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {/* Time Period Filter */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <label style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-dark)' }}>Time Period:</label>
+                        <select
+                            value={timePeriod}
+                            onChange={(e) => setTimePeriod(e.target.value)}
+                            style={{
+                                padding: '8px 12px',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: '6px',
+                                fontSize: '14px',
+                                cursor: 'pointer',
+                                background: 'white'
+                            }}
+                        >
+                            <option value="this_week">This Week</option>
+                            <option value="this_month">This Month</option>
+                            <option value="next_week">Next Week</option>
+                            <option value="next_month">Next Month</option>
+                        </select>
+                    </div>
+
+                    {/* Inspector Filter */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <label style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-dark)' }}>Inspector:</label>
+                        <select
+                            value={inspectorFilter}
+                            onChange={(e) => setInspectorFilter(e.target.value)}
+                            style={{
+                                padding: '8px 12px',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: '6px',
+                                fontSize: '14px',
+                                cursor: 'pointer',
+                                background: 'white'
+                            }}
+                        >
+                            <option value="anyone">Anyone</option>
+                            <option value="me">Me</option>
+                        </select>
+                    </div>
+
+                    {/* Task Type Filter */}
                     <div className="filter-btn-group">
                         <button
                             className={`filter-btn ${filter === 'all' ? 'active' : ''}`}
@@ -143,7 +258,7 @@ const Schedule = () => {
             <div className="calendar-wrapper card">
                 <Calendar
                     localizer={localizer}
-                    events={filteredEvents}
+                    events={events}
                     startAccessor="start"
                     endAccessor="end"
                     style={{ height: 700 }}

@@ -2,8 +2,10 @@ import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import AuthContext from '../context/AuthContext';
+import { apiBaseUrl } from '../config/api';
 import { Users, Plus, Edit2, Trash2, Search, X, Eye, EyeOff, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 const UserManagement = () => {
     const { user } = useContext(AuthContext);
@@ -36,7 +38,7 @@ const UserManagement = () => {
     const fetchUsers = async () => {
         try {
             const config = { headers: { Authorization: `Bearer ${user.token}` } };
-            const { data } = await axios.get('http://localhost:5000/api/users', config);
+            const { data } = await axios.get(`${apiBaseUrl}/users`, config);
             setUsers(data);
             setLoading(false);
         } catch (error) {
@@ -49,7 +51,7 @@ const UserManagement = () => {
     const fetchLocations = async () => {
         try {
             const config = { headers: { Authorization: `Bearer ${user.token}` } };
-            const { data } = await axios.get('http://localhost:5000/api/locations', config);
+            const { data } = await axios.get(`${apiBaseUrl}/locations`, config);
             setLocations(data);
         } catch (error) {
             console.error(error);
@@ -66,10 +68,10 @@ const UserManagement = () => {
                 const updateData = { ...formData };
                 if (!updateData.password) delete updateData.password;
 
-                await axios.put(`http://localhost:5000/api/users/${editingUser._id}`, updateData, config);
+                await axios.put(`${apiBaseUrl}/users/${editingUser._id}`, updateData, config);
                 toast.success('User updated successfully');
             } else {
-                await axios.post('http://localhost:5000/api/users', formData, config);
+                await axios.post(`${apiBaseUrl}/users`, formData, config);
                 toast.success('User created successfully');
             }
 
@@ -87,7 +89,7 @@ const UserManagement = () => {
 
         try {
             const config = { headers: { Authorization: `Bearer ${user.token}` } };
-            await axios.delete(`http://localhost:5000/api/users/${userId}`, config);
+            await axios.delete(`${apiBaseUrl}/users/${userId}`, config);
             toast.success('User deleted successfully');
             fetchUsers();
         } catch (error) {
@@ -128,7 +130,7 @@ const UserManagement = () => {
         u.email.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    if (loading) return <div className="p-8 text-center">Loading users...</div>;
+    if (loading) return <LoadingSpinner message="Loading users..." type="three-dots" color="#3b82f6" height={60} width={60} />;
 
     return (
         <div className="user-management">

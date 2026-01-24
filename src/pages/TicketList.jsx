@@ -2,7 +2,8 @@ import { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import AuthContext from '../context/AuthContext';
-import { Filter, Plus, AlertCircle, User as UserIcon, Calendar, MapPin, CheckCircle, Clock } from 'lucide-react';
+import { apiBaseUrl } from '../config/api';
+import { Filter, Plus, AlertCircle, User as UserIcon, Calendar, MapPin, CheckCircle, Clock, Search, ArrowUpDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import AssignTicketModal from '../components/AssignTicketModal';
 import ScheduleTicketModal from '../components/ScheduleTicketModal';
@@ -13,10 +14,14 @@ import LoadingSpinner from '../components/LoadingSpinner';
 const TicketList = () => {
   const { user } = useContext(AuthContext);
   const [tickets, setTickets] = useState([]);
+  const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('inbox'); // 'inbox', 'scheduled', 'all'
   const [filter, setFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
-  const [scheduleFilter, setScheduleFilter] = useState('all');
+  const [locationFilter, setLocationFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('recently_active');
+  const [searchTerm, setSearchTerm] = useState('');
   const [users, setUsers] = useState([]);
   const [assignModal, setAssignModal] = useState(null);
   const [scheduleModal, setScheduleModal] = useState(null);
@@ -24,7 +29,7 @@ const TicketList = () => {
   const [detailsModal, setDetailsModal] = useState(null);
 
   useEffect(() => {
-    const fetchTickets = async () => {
+    const fetchData = async () => {
       if (!user || !user.token) {
         setLoading(false);
         return;
@@ -33,16 +38,20 @@ const TicketList = () => {
         const config = {
           headers: { Authorization: `Bearer ${user.token}` },
         };
-        const { data } = await axios.get('http://localhost:5000/api/tickets', config);
-        setTickets(data);
+        const [ticketsRes, locationsRes] = await Promise.all([
+          axios.get(`${apiBaseUrl}/tickets`, config),
+          axios.get(`${apiBaseUrl}/locations`, config)
+        ]);
+        setTickets(ticketsRes.data);
+        setLocations(locationsRes.data);
         setLoading(false);
       } catch (error) {
         console.error(error);
-        toast.error('Failed to load tickets');
+        toast.error('Failed to load data');
         setLoading(false);
       }
     };
-    fetchTickets();
+    fetchData();
   }, [user]);
 
   useEffect(() => {
@@ -50,7 +59,7 @@ const TicketList = () => {
       if (!user || !user.token) return;
       try {
         const config = { headers: { Authorization: `Bearer ${user.token}` } };
-        const { data } = await axios.get('http://localhost:5000/api/users', config);
+        const { data } = await axios.get(`${apiBaseUrl}/users`, config);
         setUsers(data);
       } catch (error) {
         console.error(error);
@@ -62,7 +71,7 @@ const TicketList = () => {
   const refetchTickets = async () => {
     try {
       const config = { headers: { Authorization: `Bearer ${user.token}` } };
-      const { data } = await axios.get('http://localhost:5000/api/tickets', config);
+      const { data } = await axios.get(`${apiBaseUrl}/tickets`, config);
       setTickets(data);
     } catch (error) {
       console.error(error);
@@ -87,15 +96,62 @@ const TicketList = () => {
     }
   };
 
-  const filteredTickets = tickets.filter(ticket => {
+  // Filter tickets based on tab, filters, and search
+  let filteredTickets = tickets.filter(ticket => {
+    // Tab filters
+    if (activeTab === 'inbox' && ['resolved', 'closed', 'verified'].includes(ticket.status)) return false;
+    if (activeTab === 'scheduled' && !ticket.scheduledDate) return false;
+    
+    // Status filter
     if (filter !== 'all' && ticket.status !== filter) return false;
+    
+    // Priority filter
     if (priorityFilter !== 'all' && ticket.priority !== priorityFilter) return false;
-    if (scheduleFilter === 'scheduled' && !ticket.scheduledDate) return false;
-    if (scheduleFilter === 'unscheduled' && ticket.scheduledDate) return false;
+    
+    // Location filter
+    if (locationFilter !== 'all' && ticket.location?._id !== locationFilter) return false;
+    
+    // Search by Ticket ID
+    if (searchTerm && !ticket._id.toLowerCase().includes(searchTerm.toLowerCase()) && 
+        !ticket.title.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+    
     return true;
   });
 
-  if (loading) return <LoadingSpinner message="Loading tickets..." />;
+  // Sort tickets
+  filteredTickets = [...filteredTickets].sort((a, b) => {
+    switch (sortBy) {
+      case 'status_location':
+        const statusOrder = { 'open': 1, 'in_progress': 2, 'resolved': 3, 'closed': 4, 'verified': 5 };
+        const statusDiff = (statusOrder[a.status] || 99) - (statusOrder[b.status] || 99);
+        if (statusDiff !== 0) return statusDiff;
+        return (a.location?.name || '').localeCompare(b.location?.name || '');
+      
+      case 'priority':
+        const priorityOrder = { 'urgent': 1, 'high': 2, 'medium': 3, 'low': 4 };
+        return (priorityOrder[a.priority] || 99) - (priorityOrder[b.priority] || 99);
+      
+      case 'old_to_new':
+        return new Date(a.createdAt) - new Date(b.createdAt);
+      
+      case 'new_to_old':
+        return new Date(b.createdAt) - new Date(a.createdAt);
+      
+      case 'recently_active':
+        return new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt);
+      
+      case 'due_soon':
+        if (!a.dueDate && !b.dueDate) return 0;
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return new Date(a.dueDate) - new Date(b.dueDate);
+      
+      default:
+        return 0;
+    }
+  });
+
+  if (loading) return <LoadingSpinner message="Loading tickets..." type="three-dots" color="#ef4444" height={60} width={60} />;
 
   return (
     <div className="fade-in">
@@ -108,27 +164,155 @@ const TicketList = () => {
         )}
       </div>
 
-      <div className="filter-bar">
-        <Filter size={18} className="text-muted" />
-        <select value={filter} onChange={(e) => setFilter(e.target.value)} className="filter-select">
-          <option value="all">All Statuses</option>
-          <option value="open">Open</option>
-          <option value="in_progress">In Progress</option>
-          <option value="resolved">Resolved</option>
-          <option value="verified">Verified</option>
-        </select>
-        <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)} className="filter-select">
-          <option value="all">All Priorities</option>
-          <option value="low">Low</option>
-          <option value="medium">Medium</option>
-          <option value="high">High</option>
-          <option value="urgent">Urgent</option>
-        </select>
-        <select value={scheduleFilter} onChange={(e) => setScheduleFilter(e.target.value)} className="filter-select">
-          <option value="all">All Tickets</option>
-          <option value="scheduled">Scheduled</option>
-          <option value="unscheduled">Unscheduled</option>
-        </select>
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '2px solid #e2e8f0' }}>
+        <button
+          onClick={() => setActiveTab('inbox')}
+          style={{
+            padding: '12px 24px',
+            border: 'none',
+            background: 'none',
+            borderBottom: activeTab === 'inbox' ? '2px solid var(--primary-color)' : '2px solid transparent',
+            color: activeTab === 'inbox' ? 'var(--primary-color)' : 'var(--text-muted)',
+            fontWeight: activeTab === 'inbox' ? '600' : '400',
+            cursor: 'pointer',
+            marginBottom: '-2px'
+          }}
+        >
+          Inbox ({tickets.filter(t => !['resolved', 'closed', 'verified'].includes(t.status)).length})
+        </button>
+        <button
+          onClick={() => setActiveTab('scheduled')}
+          style={{
+            padding: '12px 24px',
+            border: 'none',
+            background: 'none',
+            borderBottom: activeTab === 'scheduled' ? '2px solid var(--primary-color)' : '2px solid transparent',
+            color: activeTab === 'scheduled' ? 'var(--primary-color)' : 'var(--text-muted)',
+            fontWeight: activeTab === 'scheduled' ? '600' : '400',
+            cursor: 'pointer',
+            marginBottom: '-2px'
+          }}
+        >
+          Scheduled ({tickets.filter(t => t.scheduledDate).length})
+        </button>
+        <button
+          onClick={() => setActiveTab('all')}
+          style={{
+            padding: '12px 24px',
+            border: 'none',
+            background: 'none',
+            borderBottom: activeTab === 'all' ? '2px solid var(--primary-color)' : '2px solid transparent',
+            color: activeTab === 'all' ? 'var(--primary-color)' : 'var(--text-muted)',
+            fontWeight: activeTab === 'all' ? '600' : '400',
+            cursor: 'pointer',
+            marginBottom: '-2px'
+          }}
+        >
+          All Tickets ({tickets.length})
+        </button>
+      </div>
+
+      {/* Search and Filters */}
+      <div className="filter-section" style={{ marginBottom: '20px', padding: '16px', background: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px', flexWrap: 'wrap' }}>
+          <Filter size={18} className="text-muted" />
+          <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: 'var(--text-dark)' }}>Filters</h3>
+        </div>
+
+        {/* Search */}
+        <div style={{ marginBottom: '12px' }}>
+          <div style={{ position: 'relative' }}>
+            <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <input
+              type="text"
+              placeholder="Search by Ticket ID or Title"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '8px 12px 8px 40px',
+                border: '1px solid #e2e8f0',
+                borderRadius: '6px',
+                fontSize: '14px'
+              }}
+            />
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+          {/* Status Filter */}
+          <div>
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '6px', color: 'var(--text-muted)' }}>Status</label>
+            <select 
+              value={filter} 
+              onChange={(e) => setFilter(e.target.value)} 
+              className="filter-select"
+              style={{ width: '100%', padding: '8px', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '14px' }}
+            >
+              <option value="all">All Statuses</option>
+              <option value="open">Open</option>
+              <option value="in_progress">In Progress</option>
+              <option value="resolved">Resolved</option>
+              <option value="closed">Closed</option>
+              <option value="verified">Verified</option>
+            </select>
+          </div>
+
+          {/* Priority Filter */}
+          <div>
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '6px', color: 'var(--text-muted)' }}>Priority</label>
+            <select 
+              value={priorityFilter} 
+              onChange={(e) => setPriorityFilter(e.target.value)} 
+              className="filter-select"
+              style={{ width: '100%', padding: '8px', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '14px' }}
+            >
+              <option value="all">All Priorities</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+          </div>
+
+          {/* Location Filter */}
+          <div>
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '6px', color: 'var(--text-muted)' }}>Location</label>
+            <select 
+              value={locationFilter} 
+              onChange={(e) => setLocationFilter(e.target.value)} 
+              className="filter-select"
+              style={{ width: '100%', padding: '8px', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '14px' }}
+            >
+              <option value="all">All Locations</option>
+              {locations.map(loc => (
+                <option key={loc._id} value={loc._id}>{loc.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Sort Options */}
+          <div>
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '6px', color: 'var(--text-muted)' }}>
+              <ArrowUpDown size={14} style={{ display: 'inline', marginRight: '4px' }} />
+              Sort By
+            </label>
+            <select 
+              value={sortBy} 
+              onChange={(e) => setSortBy(e.target.value)} 
+              className="filter-select"
+              style={{ width: '100%', padding: '8px', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '14px' }}
+            >
+              <option value="recently_active">Recently Active</option>
+              <option value="status_location">Status and Location</option>
+              <option value="priority">Priority</option>
+              <option value="old_to_new">Old to New</option>
+              <option value="new_to_old">New to Old</option>
+              <option value="due_soon">Due Soon</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       <div className="grid-cards">
@@ -201,7 +385,7 @@ const TicketList = () => {
                         e.stopPropagation();
                         try {
                           const config = { headers: { Authorization: `Bearer ${user.token}` } };
-                          await axios.put(`http://localhost:5000/api/tickets/${ticket._id}`, {
+                          await axios.put(`${apiBaseUrl}/tickets/${ticket._id}`, {
                             title: ticket.title,
                             description: ticket.description,
                             location: ticket.location._id || ticket.location,

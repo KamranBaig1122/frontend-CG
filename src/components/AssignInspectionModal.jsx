@@ -1,8 +1,10 @@
 import { useState, useContext } from 'react';
 import axios from 'axios';
 import AuthContext from '../context/AuthContext';
+import { apiBaseUrl } from '../config/api';
 import toast from 'react-hot-toast';
 import { X, User } from 'lucide-react';
+import LoadingSpinner from './LoadingSpinner';
 
 const AssignInspectionModal = ({ inspection, onClose, onSuccess, users }) => {
     const { user } = useContext(AuthContext);
@@ -17,7 +19,7 @@ const AssignInspectionModal = ({ inspection, onClose, onSuccess, users }) => {
             const config = {
                 headers: { Authorization: `Bearer ${user.token}` },
             };
-            await axios.patch(`http://localhost:5000/api/inspections/${inspection._id}/assign`,
+            await axios.patch(`${apiBaseUrl}/inspections/${inspection._id}/assign`,
                 { inspector },
                 config
             );
@@ -42,6 +44,11 @@ const AssignInspectionModal = ({ inspection, onClose, onSuccess, users }) => {
 
                 <form onSubmit={handleSubmit}>
                     <div className="modal-body">
+                        {loading && (
+                            <div style={{ marginBottom: '16px', padding: '16px', background: '#f8fafc', borderRadius: '8px', textAlign: 'center' }}>
+                                <LoadingSpinner message="Assigning inspection..." type="tail-spin" color="#3b82f6" height={30} width={30} />
+                            </div>
+                        )}
                         <p className="inspection-title">Location: {inspection.location?.name}</p>
                         <div className="form-group">
                             <label>Assign To</label>
@@ -50,6 +57,7 @@ const AssignInspectionModal = ({ inspection, onClose, onSuccess, users }) => {
                                 value={inspector}
                                 onChange={(e) => setInspector(e.target.value)}
                                 required
+                                disabled={loading}
                             >
                                 <option value="">Select Supervisor</option>
                                 {users.filter(u => u.role === 'supervisor').map(u => (
@@ -60,11 +68,16 @@ const AssignInspectionModal = ({ inspection, onClose, onSuccess, users }) => {
                     </div>
 
                     <div className="modal-footer">
-                        <button type="button" className="btn btn-secondary" onClick={onClose}>
+                        <button type="button" className="btn btn-secondary" onClick={onClose} disabled={loading}>
                             Cancel
                         </button>
                         <button type="submit" className="btn btn-primary" disabled={loading}>
-                            {loading ? 'Assigning...' : 'Assign Inspection'}
+                            {loading ? (
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <LoadingSpinner type="tail-spin" color="white" height={16} width={16} />
+                                    Assigning...
+                                </span>
+                            ) : 'Assign Inspection'}
                         </button>
                     </div>
                 </form>

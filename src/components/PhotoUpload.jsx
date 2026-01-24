@@ -1,8 +1,10 @@
 import { useState, useContext } from 'react';
 import axios from 'axios';
 import AuthContext from '../context/AuthContext';
+import { apiBaseUrl } from '../config/api';
 import { Camera, Upload, X } from 'lucide-react';
 import toast from 'react-hot-toast';
+import LoadingSpinner from './LoadingSpinner';
 
 const PhotoUpload = ({ onPhotosUploaded, existingPhotos = [] }) => {
     const { user } = useContext(AuthContext);
@@ -25,7 +27,7 @@ const PhotoUpload = ({ onPhotosUploaded, existingPhotos = [] }) => {
                         Authorization: `Bearer ${user.token}`,
                     },
                 };
-                const { data } = await axios.post('http://localhost:5000/api/upload', formData, config);
+                const { data } = await axios.post(`${apiBaseUrl}/upload`, formData, config);
                 const newPhotos = [...photos, data.url];
                 setPhotos(newPhotos);
                 onPhotosUploaded(newPhotos);
@@ -43,7 +45,7 @@ const PhotoUpload = ({ onPhotosUploaded, existingPhotos = [] }) => {
                         Authorization: `Bearer ${user.token}`,
                     },
                 };
-                const { data } = await axios.post('http://localhost:5000/api/upload/multiple', formData, config);
+                const { data } = await axios.post(`${apiBaseUrl}/upload/multiple`, formData, config);
                 const newPhotos = [...photos, ...data.files.map(f => f.url)];
                 setPhotos(newPhotos);
                 onPhotosUploaded(newPhotos);
@@ -64,10 +66,22 @@ const PhotoUpload = ({ onPhotosUploaded, existingPhotos = [] }) => {
 
     return (
         <div className="photo-upload">
+            {uploading && (
+                <div style={{ 
+                    padding: '20px', 
+                    textAlign: 'center', 
+                    background: '#f8fafc', 
+                    borderRadius: '8px', 
+                    marginBottom: '15px',
+                    border: '1px solid #e2e8f0'
+                }}>
+                    <LoadingSpinner message="Uploading photos..." type="tail-spin" color="#3b82f6" height={40} width={40} />
+                </div>
+            )}
             <div className="upload-buttons">
-                <label className="upload-btn">
+                <label className="upload-btn" style={{ opacity: uploading ? 0.6 : 1, pointerEvents: uploading ? 'none' : 'auto' }}>
                     <Camera size={18} />
-                    <span>{uploading ? 'Uploading...' : 'Take Photo'}</span>
+                    <span>Take Photo</span>
                     <input
                         type="file"
                         accept="image/*"
@@ -77,9 +91,9 @@ const PhotoUpload = ({ onPhotosUploaded, existingPhotos = [] }) => {
                         style={{ display: 'none' }}
                     />
                 </label>
-                <label className="upload-btn">
+                <label className="upload-btn" style={{ opacity: uploading ? 0.6 : 1, pointerEvents: uploading ? 'none' : 'auto' }}>
                     <Upload size={18} />
-                    <span>{uploading ? 'Uploading...' : 'Upload'}</span>
+                    <span>Upload</span>
                     <input
                         type="file"
                         accept="image/*"

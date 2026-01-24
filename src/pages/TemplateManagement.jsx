@@ -2,8 +2,10 @@ import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import AuthContext from '../context/AuthContext';
+import { apiBaseUrl } from '../config/api';
 import toast from 'react-hot-toast';
 import { FileText, Plus, Pencil, Trash2, Copy } from 'lucide-react';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 const TemplateManagement = () => {
     const { user } = useContext(AuthContext);
@@ -22,7 +24,7 @@ const TemplateManagement = () => {
     const fetchTemplates = async () => {
         try {
             const config = { headers: { Authorization: `Bearer ${user.token}` } };
-            const { data } = await axios.get('http://localhost:5000/api/templates', config);
+            const { data } = await axios.get(`${apiBaseUrl}/templates`, config);
             setTemplates(data);
             setLoading(false);
         } catch (error) {
@@ -36,7 +38,7 @@ const TemplateManagement = () => {
         if (!window.confirm('Are you sure you want to delete this template?')) return;
         try {
             const config = { headers: { Authorization: `Bearer ${user.token}` } };
-            await axios.delete(`http://localhost:5000/api/templates/${id}`, config);
+            await axios.delete(`${apiBaseUrl}/templates/${id}`, config);
             toast.success('Template deleted successfully');
             fetchTemplates();
         } catch (error) {
@@ -53,7 +55,7 @@ const TemplateManagement = () => {
                 description: template.description,
                 sections: template.sections,
             };
-            await axios.post('http://localhost:5000/api/templates', clonedData, config);
+            await axios.post(`${apiBaseUrl}/templates`, clonedData, config);
             toast.success('Template cloned successfully');
             fetchTemplates();
         } catch (error) {
@@ -62,7 +64,7 @@ const TemplateManagement = () => {
         }
     };
 
-    if (loading) return <div className="p-8 text-center">Loading...</div>;
+    if (loading) return <LoadingSpinner message="Loading templates..." type="three-dots" color="#3b82f6" height={60} width={60} />;
 
     return (
         <div className="template-management">
