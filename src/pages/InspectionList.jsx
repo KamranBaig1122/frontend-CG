@@ -25,6 +25,7 @@ const InspectionList = () => {
     const [assignModal, setAssignModal] = useState(null);
     const [scheduleModal, setScheduleModal] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [showMyInspections, setShowMyInspections] = useState(false); // Added state
 
     useEffect(() => {
         let isMounted = true;
@@ -108,14 +109,20 @@ const InspectionList = () => {
             const templateName = inspection.template?.name?.toLowerCase() || '';
             const inspectorName = inspection.inspector?.name?.toLowerCase() || '';
             const status = inspection.status?.toLowerCase() || '';
-            
-            if (!locationName.includes(query) && 
-                !templateName.includes(query) && 
-                !inspectorName.includes(query) && 
+
+            if (!locationName.includes(query) &&
+                !templateName.includes(query) &&
+                !inspectorName.includes(query) &&
                 !status.includes(query) &&
                 !inspection._id.toLowerCase().includes(query)) {
                 return false;
             }
+        }
+
+        // My Inspections Filter
+        if (showMyInspections) {
+            const inspectorId = typeof inspection.inspector === 'object' ? inspection.inspector?._id : inspection.inspector;
+            if (inspectorId !== user._id) return false;
         }
 
         // Score filter
@@ -123,13 +130,18 @@ const InspectionList = () => {
         if (scoreFilter === 'good' && (inspection.totalScore < 75 || inspection.totalScore >= 90)) return false;
         if (scoreFilter === 'poor' && inspection.totalScore >= 75) return false;
 
-        // Status filter (Deficient, Flagged, Private)
+        // Status filter (Deficient, Flagged, Private, and actual Status)
         if (statusFilter === 'deficient' && !inspection.isDeficient) return false;
         if (statusFilter === 'not_deficient' && inspection.isDeficient) return false;
         if (statusFilter === 'flagged' && !inspection.isFlagged) return false;
         if (statusFilter === 'not_flagged' && inspection.isFlagged) return false;
         if (statusFilter === 'private' && !inspection.isPrivate) return false;
         if (statusFilter === 'not_private' && inspection.isPrivate) return false;
+
+        // New status values
+        if (['in_progress', 'completed', 'submitted', 'assigned', 'pending'].includes(statusFilter)) {
+            if (inspection.status !== statusFilter) return false;
+        }
 
         // Location filter
         if (locationFilter !== 'all' && inspection.location?._id !== locationFilter) return false;
@@ -156,9 +168,9 @@ const InspectionList = () => {
                     </p>
                 </div>
                 {(user?.role === 'admin' || user?.role === 'sub_admin') && (
-                    <Link to="/inspections/new" className="btn" style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
+                    <Link to="/inspections/new" className="btn" style={{
+                        display: 'flex',
+                        alignItems: 'center',
                         gap: '8px',
                         padding: '12px 24px',
                         background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
@@ -171,24 +183,24 @@ const InspectionList = () => {
             </div>
 
             {/* Search Bar */}
-            <div className="card" style={{ 
-                marginBottom: '24px', 
+            <div className="card" style={{
+                marginBottom: '24px',
                 padding: '20px',
                 background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
                 border: '1px solid #e2e8f0',
                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
             }}>
                 <div style={{ position: 'relative' }}>
-                    <Search 
-                        size={20} 
-                        style={{ 
-                            position: 'absolute', 
-                            left: '16px', 
-                            top: '50%', 
+                    <Search
+                        size={20}
+                        style={{
+                            position: 'absolute',
+                            left: '16px',
+                            top: '50%',
                             transform: 'translateY(-50%)',
                             color: '#94a3b8',
                             pointerEvents: 'none'
-                        }} 
+                        }}
                     />
                     <input
                         type="text"
@@ -247,18 +259,32 @@ const InspectionList = () => {
             </div>
 
             <div className="filter-section" style={{ marginBottom: '20px', padding: '16px', background: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px', flexWrap: 'wrap' }}>
-                    <Filter size={18} className="text-muted" />
-                    <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: 'var(--text-dark)' }}>Filters</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <Filter size={18} className="text-muted" />
+                        <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: 'var(--text-dark)' }}>Filters</h3>
+                    </div>
+
+                    {/* My Inspections Toggle */}
+                    <div className="form-group checkbox-group" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                        <input
+                            type="checkbox"
+                            id="myInspections"
+                            checked={showMyInspections}
+                            onChange={(e) => setShowMyInspections(e.target.checked)}
+                            style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                        />
+                        <label htmlFor="myInspections" style={{ margin: 0, fontSize: '14px', cursor: 'pointer', fontWeight: '500' }}>My Inspections</label>
+                    </div>
                 </div>
-                
+
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
                     {/* Score Filter */}
                     <div>
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '6px', color: 'var(--text-muted)' }}>Score</label>
-                        <select 
-                            value={scoreFilter} 
-                            onChange={(e) => setScoreFilter(e.target.value)} 
+                        <select
+                            value={scoreFilter}
+                            onChange={(e) => setScoreFilter(e.target.value)}
                             className="filter-select"
                             style={{ width: '100%', padding: '8px', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '14px' }}
                         >
@@ -272,28 +298,29 @@ const InspectionList = () => {
                     {/* Status Filter */}
                     <div>
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '6px', color: 'var(--text-muted)' }}>Status</label>
-                        <select 
-                            value={statusFilter} 
-                            onChange={(e) => setStatusFilter(e.target.value)} 
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
                             className="filter-select"
                             style={{ width: '100%', padding: '8px', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '14px' }}
                         >
                             <option value="all">All Inspections</option>
-                            <option value="deficient">Deficient</option>
-                            <option value="not_deficient">Not Deficient</option>
-                            <option value="flagged">Flagged</option>
-                            <option value="not_flagged">Not Flagged</option>
-                            <option value="private">Private</option>
-                            <option value="not_private">Not Private</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                            <option value="pending">Pending</option>
+                            <option value="assigned">Assigned</option>
+                            <option value="deficient">Deficient (Flag)</option>
+                            <option value="flagged">Flagged (Flag)</option>
+                            <option value="private">Private (Flag)</option>
                         </select>
                     </div>
 
                     {/* Location Filter */}
                     <div>
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '6px', color: 'var(--text-muted)' }}>Location</label>
-                        <select 
-                            value={locationFilter} 
-                            onChange={(e) => setLocationFilter(e.target.value)} 
+                        <select
+                            value={locationFilter}
+                            onChange={(e) => setLocationFilter(e.target.value)}
                             className="filter-select"
                             style={{ width: '100%', padding: '8px', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '14px' }}
                         >
@@ -329,20 +356,20 @@ const InspectionList = () => {
                 </div>
             </div>
 
-            <div className="grid-cards" style={{ 
+            <div className="grid-cards" style={{
                 gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))',
                 gap: '24px'
             }}>
                 {filteredInspections.map(inspection => {
-                    const scoreColor = inspection.totalScore >= 90 ? '#10b981' : 
-                                     inspection.totalScore >= 75 ? '#f59e0b' : '#ef4444';
-                    const scoreGradient = inspection.totalScore >= 90 ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 
-                                         inspection.totalScore >= 75 ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 
-                                         'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
-                    
+                    const scoreColor = inspection.totalScore >= 90 ? '#10b981' :
+                        inspection.totalScore >= 75 ? '#f59e0b' : '#ef4444';
+                    const scoreGradient = inspection.totalScore >= 90 ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' :
+                        inspection.totalScore >= 75 ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' :
+                            'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+
                     return (
-                        <div 
-                            key={inspection._id} 
+                        <div
+                            key={inspection._id}
                             className="card"
                             style={{
                                 background: 'white',
@@ -381,9 +408,9 @@ const InspectionList = () => {
                             </div>
 
                             {/* Status Indicators */}
-                            <div style={{ 
-                                display: 'flex', 
-                                gap: '8px', 
+                            <div style={{
+                                display: 'flex',
+                                gap: '8px',
                                 marginBottom: '16px',
                                 flexWrap: 'wrap'
                             }}>
@@ -442,9 +469,9 @@ const InspectionList = () => {
 
                             {/* Location & Template */}
                             <div style={{ marginBottom: '20px', paddingRight: '100px' }}>
-                                <h3 style={{ 
-                                    fontSize: '20px', 
-                                    fontWeight: '700', 
+                                <h3 style={{
+                                    fontSize: '20px',
+                                    fontWeight: '700',
                                     margin: '0 0 8px 0',
                                     color: '#1e293b',
                                     display: 'flex',
@@ -454,8 +481,8 @@ const InspectionList = () => {
                                     <MapPin size={20} style={{ color: '#3b82f6' }} />
                                     {inspection.location?.name || 'Unknown Location'}
                                 </h3>
-                                <p style={{ 
-                                    fontSize: '14px', 
+                                <p style={{
+                                    fontSize: '14px',
                                     color: '#64748b',
                                     margin: 0,
                                     display: 'flex',
@@ -468,8 +495,8 @@ const InspectionList = () => {
                             </div>
 
                             {/* Info Cards */}
-                            <div style={{ 
-                                display: 'grid', 
+                            <div style={{
+                                display: 'grid',
                                 gridTemplateColumns: '1fr 1fr',
                                 gap: '12px',
                                 marginBottom: '20px'
@@ -480,8 +507,8 @@ const InspectionList = () => {
                                     borderRadius: '10px',
                                     border: '1px solid #e2e8f0'
                                 }}>
-                                    <div style={{ 
-                                        fontSize: '11px', 
+                                    <div style={{
+                                        fontSize: '11px',
                                         color: '#64748b',
                                         fontWeight: '600',
                                         textTransform: 'uppercase',
@@ -493,8 +520,8 @@ const InspectionList = () => {
                                         <UserIcon size={12} />
                                         Inspector
                                     </div>
-                                    <div style={{ 
-                                        fontSize: '14px', 
+                                    <div style={{
+                                        fontSize: '14px',
                                         fontWeight: '600',
                                         color: '#1e293b'
                                     }}>
@@ -507,8 +534,8 @@ const InspectionList = () => {
                                     borderRadius: '10px',
                                     border: '1px solid #e2e8f0'
                                 }}>
-                                    <div style={{ 
-                                        fontSize: '11px', 
+                                    <div style={{
+                                        fontSize: '11px',
                                         color: '#64748b',
                                         fontWeight: '600',
                                         textTransform: 'uppercase',
@@ -518,48 +545,54 @@ const InspectionList = () => {
                                         gap: '4px'
                                     }}>
                                         <Clock size={12} />
-                                        Date
+                                        {inspection.scheduledDate ? 'Scheduled' : 'Created'}
                                     </div>
-                                    <div style={{ 
-                                        fontSize: '14px', 
+                                    <div style={{
+                                        fontSize: '14px',
                                         fontWeight: '600',
                                         color: '#1e293b'
                                     }}>
-                                        {new Date(inspection.createdAt).toLocaleDateString('en-US', { 
-                                            month: 'short', 
-                                            day: 'numeric', 
-                                            year: 'numeric' 
+                                        {new Date(inspection.scheduledDate || inspection.createdAt).toLocaleDateString('en-US', {
+                                            month: 'short',
+                                            day: 'numeric',
+                                            year: 'numeric',
+                                            hour: inspection.scheduledDate ? '2-digit' : undefined,
+                                            minute: inspection.scheduledDate ? '2-digit' : undefined
                                         })}
                                     </div>
                                 </div>
                             </div>
 
                             {/* Status Badge */}
-                            <div style={{ 
+                            <div style={{
                                 marginBottom: '20px',
                                 display: 'inline-block'
                             }}>
                                 <span style={{
                                     padding: '6px 14px',
-                                    background: ['completed', 'submitted'].includes(inspection.status) ? 
-                                        'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 
-                                        'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                                    background: ['completed', 'submitted'].includes(inspection.status) ?
+                                        'linear-gradient(135deg, #10b981 0%, #059669 100%)' :
+                                        inspection.status === 'pending' ?
+                                            'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' :
+                                            'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                                     color: 'white',
                                     borderRadius: '20px',
                                     fontSize: '12px',
                                     fontWeight: '600',
                                     textTransform: 'capitalize',
-                                    boxShadow: ['completed', 'submitted'].includes(inspection.status) ? 
-                                        '0 4px 12px rgba(16, 185, 129, 0.3)' : 
-                                        '0 4px 12px rgba(59, 130, 246, 0.3)'
+                                    boxShadow: ['completed', 'submitted'].includes(inspection.status) ?
+                                        '0 4px 12px rgba(16, 185, 129, 0.3)' :
+                                        inspection.status === 'pending' ?
+                                            '0 4px 12px rgba(245, 158, 11, 0.3)' :
+                                            '0 4px 12px rgba(59, 130, 246, 0.3)'
                                 }}>
                                     {inspection.status.replace('_', ' ')}
                                 </span>
                             </div>
 
                             {/* Action Buttons */}
-                            <div style={{ 
-                                display: 'flex', 
+                            <div style={{
+                                display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
                                 paddingTop: '20px',
@@ -598,10 +631,11 @@ const InspectionList = () => {
                                                     <UserIcon size={18} />
                                                 </button>
                                             )}
-                                            {!inspection.scheduledDate && (
+                                            {/* Allow scheduling if not scheduled OR if user is admin/sub-admin (to reschedule) */}
+                                            {(!inspection.scheduledDate || user?.role === 'admin' || user?.role === 'sub_admin') && (
                                                 <button
                                                     onClick={() => setScheduleModal(inspection)}
-                                                    title="Schedule inspection"
+                                                    title={inspection.scheduledDate ? "Reschedule inspection" : "Schedule inspection"}
                                                     style={{
                                                         padding: '10px',
                                                         background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
@@ -630,39 +664,63 @@ const InspectionList = () => {
                                         </>
                                     )}
                                     {user?.role === 'supervisor' && inspection.status === 'in_progress' && (
-                                        <Link 
-                                            to={`/inspections/${inspection._id}/perform`} 
-                                            title="Perform Inspection"
-                                            style={{
-                                                padding: '10px',
-                                                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                                                color: 'white',
-                                                border: 'none',
-                                                borderRadius: '10px',
-                                                cursor: 'pointer',
-                                                transition: 'all 0.2s',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                textDecoration: 'none',
-                                                boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)'
-                                            }}
-                                            onMouseEnter={(e) => {
-                                                e.currentTarget.style.transform = 'scale(1.05)';
-                                                e.currentTarget.style.boxShadow = '0 4px 8px rgba(16, 185, 129, 0.4)';
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                e.currentTarget.style.transform = 'scale(1)';
-                                                e.currentTarget.style.boxShadow = '0 2px 4px rgba(16, 185, 129, 0.3)';
-                                            }}
-                                        >
-                                            <CheckCircle size={18} />
-                                        </Link>
+                                        (() => {
+                                            const scheduledTime = inspection.scheduledDate ? new Date(inspection.scheduledDate).getTime() : 0;
+                                            const now = new Date().getTime();
+                                            const canPerform = !inspection.scheduledDate || now >= scheduledTime;
+
+                                            return canPerform ? (
+                                                <Link
+                                                    to={`/inspections/${inspection._id}/perform`}
+                                                    title="Perform Inspection"
+                                                    style={{
+                                                        padding: '10px',
+                                                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                                        color: 'white',
+                                                        border: 'none',
+                                                        borderRadius: '10px',
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.2s',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        textDecoration: 'none',
+                                                        boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)'
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        e.currentTarget.style.transform = 'scale(1.05)';
+                                                        e.currentTarget.style.boxShadow = '0 4px 8px rgba(16, 185, 129, 0.4)';
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.currentTarget.style.transform = 'scale(1)';
+                                                        e.currentTarget.style.boxShadow = '0 2px 4px rgba(16, 185, 129, 0.3)';
+                                                    }}
+                                                >
+                                                    <CheckCircle size={18} />
+                                                </Link>
+                                            ) : (
+                                                <div
+                                                    title={`Scheduled for ${new Date(inspection.scheduledDate).toLocaleString()}`}
+                                                    style={{
+                                                        padding: '10px',
+                                                        background: '#e2e8f0',
+                                                        color: '#94a3b8',
+                                                        borderRadius: '10px',
+                                                        cursor: 'not-allowed',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center'
+                                                    }}
+                                                >
+                                                    <Clock size={18} />
+                                                </div>
+                                            );
+                                        })()
                                     )}
                                 </div>
                                 <div style={{ display: 'flex', gap: '8px' }}>
-                                    <Link 
-                                        to={`/inspections/${inspection._id}`} 
+                                    <Link
+                                        to={`/inspections/${inspection._id}`}
                                         title="View Details"
                                         style={{
                                             padding: '10px',
@@ -748,16 +806,16 @@ const InspectionList = () => {
                         }}>
                             <ClipboardList size={48} style={{ color: '#94a3b8' }} />
                         </div>
-                        <h3 style={{ 
-                            fontSize: '20px', 
-                            fontWeight: '600', 
+                        <h3 style={{
+                            fontSize: '20px',
+                            fontWeight: '600',
                             color: '#1e293b',
                             margin: '0 0 8px 0'
                         }}>
                             No inspections found
                         </h3>
-                        <p style={{ 
-                            fontSize: '14px', 
+                        <p style={{
+                            fontSize: '14px',
                             color: '#64748b',
                             margin: 0
                         }}>

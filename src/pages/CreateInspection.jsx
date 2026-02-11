@@ -66,7 +66,7 @@ const CreateInspection = () => {
                 template: formData.template,
                 location: formData.location,
                 inspector: formData.inspector,
-                status: 'in_progress',
+                status: 'pending',
                 sections: selectedTemplate.sections.map((section) => ({
                     sectionId: section._id,
                     name: section.name,

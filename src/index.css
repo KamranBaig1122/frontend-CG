@@ -257,4 +257,12 @@ label {
     .filter-bar {
         flex-direction: column;
     }
+    
+    .card {
+        padding: 1rem; /* Reduce padding on mobile */
+    }
+    
+    .page-header h1 {
+        font-size: 1.5rem; /* Smaller title on mobile */
+    }
 }

@@ -17,9 +17,12 @@ const ImprovedInspectionWizard = () => {
     const [step, setStep] = useState(1);
     const [locations, setLocations] = useState([]);
     const [templates, setTemplates] = useState([]);
+    const [inspectors, setInspectors] = useState([]); // Added for assignment
 
     const [selectedLocation, setSelectedLocation] = useState('');
     const [selectedTemplate, setSelectedTemplate] = useState('');
+    const [selectedInspector, setSelectedInspector] = useState(''); // Added
+    const [performNow, setPerformNow] = useState(true); // Added
 
     const [template, setTemplate] = useState(null);
     const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
@@ -38,13 +41,61 @@ const ImprovedInspectionWizard = () => {
                     // Fetch existing inspection to perform
                     const { data: inspection } = await axios.get(`${apiBaseUrl}/inspections/${id}`, config);
 
-                    // Fetch the FULL template details to get item types/weights
-                    const { data: fullTemplate } = await axios.get(`${apiBaseUrl}/templates/${inspection.template._id}`, config);
-
                     // Populate state from inspection
-                    setSelectedLocation(inspection.location._id);
-                    setSelectedTemplate(inspection.template._id);
-                    setTemplate(fullTemplate); // Use the full template object
+                    const locationId = inspection.location?._id || inspection.location;
+                    const templateId = inspection.template?._id || inspection.template;
+
+                    setSelectedLocation(locationId);
+                    setSelectedTemplate(templateId);
+
+                    // Fetch the FULL template details if we don't have them in the inspection object
+                    let fullTemplate;
+
+                    console.log('Inspection Data:', {
+                        hasTemplate: !!inspection.template,
+                        hasTemplateSections: !!(inspection.template && inspection.template.sections),
+                        sectionsLen: inspection.sections?.length,
+                        sections: inspection.sections
+                    });
+
+                    if (inspection.sections && inspection.sections.length > 0) {
+                        // PRIORITIZE SNAPSHOT: Construct template from inspection snapshot
+                        // Map sectionId -> _id and itemId -> _id to match Wizard expectation
+                        fullTemplate = {
+                            _id: templateId,
+                            name: inspection.template?.name || 'Inspection',
+                            sections: inspection.sections.map(s => ({
+                                ...s,
+                                _id: s.sectionId || s._id,
+                                items: s.items.map(i => ({
+                                    ...i,
+                                    _id: i.itemId || i._id
+                                }))
+                            }))
+                        };
+                    } else if (inspection.template && inspection.template.sections && inspection.template.sections.length > 0) {
+                        fullTemplate = inspection.template;
+                    } else {
+                        try {
+                            const { data: tmpl } = await axios.get(`${apiBaseUrl}/templates/${templateId}`, config);
+                            fullTemplate = tmpl;
+                        } catch (err) {
+                            console.warn('Could not fetch template details, using empty structure', err);
+                            fullTemplate = { _id: templateId, name: 'Unknown Template', sections: [] };
+                        }
+                    }
+
+                    setTemplate(fullTemplate);
+
+                    // If status is pending, update to in_progress as we are starting it now
+                    if (inspection.status === 'pending') {
+                        try {
+                            await axios.put(`${apiBaseUrl}/inspections/${id}`, { status: 'in_progress' }, config);
+                            inspection.status = 'in_progress'; // Update local state
+                        } catch (err) {
+                            console.error('Failed to update status to in_progress', err);
+                        }
+                    }
 
                     // Map existing sections/items to responses
                     const initialResponses = {};
@@ -63,12 +114,22 @@ const ImprovedInspectionWizard = () => {
                     setLoading(false);
                 } else {
                     // Fetch lists for new inspection
-                    const [locRes, tempRes] = await Promise.all([
+                    const promises = [
                         axios.get(`${apiBaseUrl}/locations`, config),
                         axios.get(`${apiBaseUrl}/templates`, config),
-                    ]);
-                    setLocations(locRes.data);
-                    setTemplates(tempRes.data);
+                    ];
+
+                    if (user.role === 'admin' || user.role === 'sub_admin') {
+                        promises.push(axios.get(`${apiBaseUrl}/users`, config));
+                    }
+
+                    const results = await Promise.all(promises);
+                    setLocations(results[0].data);
+                    setTemplates(results[1].data);
+
+                    if (results[2]) {
+                        setInspectors(results[2].data.filter(u => u.role === 'supervisor' || u.role === 'inspector'));
+                    }
                 }
             } catch (error) {
                 console.error(error);
@@ -79,14 +140,50 @@ const ImprovedInspectionWizard = () => {
         fetchData();
     }, [user, id]);
 
-    const handleLocationSelect = () => {
+    const handleLocationSelect = async () => {
         if (!selectedLocation || !selectedTemplate) {
             toast.error('Please select both location and template');
             return;
         }
         const temp = templates.find(t => t._id === selectedTemplate);
         setTemplate(temp);
-        setStep(2);
+
+        if (!performNow) {
+            await createAssignedInspection(temp);
+        } else {
+            setStep(2);
+        }
+    };
+
+    const createAssignedInspection = async (temp) => {
+        try {
+            const config = { headers: { Authorization: `Bearer ${user.token}` } };
+            const inspectionData = {
+                template: selectedTemplate,
+                location: selectedLocation,
+                inspector: selectedInspector || user._id,
+                status: 'pending', // Set to pending for assigned
+                sections: temp.sections.map((section) => ({
+                    sectionId: section._id,
+                    name: section.name,
+                    items: section.items.map((item) => ({
+                        itemId: item._id,
+                        name: item.name,
+                        score: null,
+                        comment: '',
+                        status: 'pass', // Default status
+                    })),
+                })),
+                totalScore: 0,
+            };
+
+            await axios.post(`${apiBaseUrl}/inspections`, inspectionData, config);
+            toast.success('Inspection assigned successfully!');
+            navigate('/inspections');
+        } catch (error) {
+            console.error(error);
+            toast.error('Failed to assign inspection');
+        }
     };
 
     const handleItemResponse = (sectionId, itemId, value, comment = '', photos = []) => {
@@ -703,8 +800,45 @@ const ImprovedInspectionWizard = () => {
                             ))}
                         </select>
                     </div>
+
+                    {(user.role === 'admin' || user.role === 'sub_admin') && (
+                        <>
+                            <div className="form-group">
+                                <label>Assign Inspector (Optional)</label>
+                                <select
+                                    value={selectedInspector}
+                                    onChange={(e) => {
+                                        setSelectedInspector(e.target.value);
+                                        if (e.target.value) setPerformNow(false);
+                                    }}
+                                >
+                                    <option value="">Myself</option>
+                                    {inspectors.map(u => (
+                                        <option key={u._id} value={u._id}>{u.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="form-group checkbox-group" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <input
+                                    type="checkbox"
+                                    id="performNow"
+                                    checked={performNow}
+                                    onChange={(e) => setPerformNow(e.target.checked)}
+                                    style={{ width: '20px', height: '20px' }}
+                                />
+                                <div>
+                                    <label htmlFor="performNow" style={{ margin: 0 }}>Perform Inspection Now</label>
+                                    <small style={{ display: 'block', color: '#64748b' }}>
+                                        {performNow ? 'Inspection will start immediately.' : 'Inspection will be created as "In Progress".'}
+                                    </small>
+                                </div>
+                            </div>
+                        </>
+                    )}
+
                     <button className="btn btn-primary" onClick={handleLocationSelect}>
-                        Continue <ChevronRight size={18} />
+                        {performNow ? <>{'Continue'} <ChevronRight size={18} /></> : <>{'Assign Inspection'} <CheckCircle size={18} /></>}
                     </button>
                 </div>
                 <style>{wizardStyles}</style>
@@ -713,7 +847,25 @@ const ImprovedInspectionWizard = () => {
     }
 
     if (step === 2 && template) {
+        if (!template.sections || template.sections.length === 0) {
+            return (
+                <div className="wizard-container">
+                    <div className="loading-card">
+                        <p>Error: This inspection has no sections to perform.</p>
+                        <button className="btn btn-secondary" onClick={() => navigate('/inspections')} style={{ marginTop: '16px' }}>
+                            Go Back
+                        </button>
+                    </div>
+                    <style>{wizardStyles}</style>
+                </div>
+            );
+        }
+
         const currentSection = template.sections[currentSectionIndex];
+        if (!currentSection) {
+            return <div>Error loading section data.</div>;
+        }
+
         const progress = Math.round(((currentSectionIndex + 1) / template.sections.length) * 100);
 
         return (
@@ -839,6 +991,20 @@ const ImprovedInspectionWizard = () => {
                     </button>
                 </div>
 
+                <style>{wizardStyles}</style>
+            </div>
+        );
+    }
+
+    if (step === 2 && !template) {
+        return (
+            <div className="wizard-container">
+                <div className="loading-card">
+                    <p>Error: Could not load inspection template data.</p>
+                    <button className="btn btn-secondary" onClick={() => navigate('/inspections')} style={{ marginTop: '16px' }}>
+                        Go Back
+                    </button>
+                </div>
                 <style>{wizardStyles}</style>
             </div>
         );

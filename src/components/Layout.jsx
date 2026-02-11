@@ -33,10 +33,12 @@ const Layout = ({ children }) => {
             <Calendar size={20} />
             <span>Schedule</span>
           </NavLink>
-          <NavLink to="/start-work" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
-            <Play size={20} />
-            <span>Start Work</span>
-          </NavLink>
+          {user?.role !== 'client' && (
+            <NavLink to="/start-work" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+              <Play size={20} />
+              <span>Start Work</span>
+            </NavLink>
+          )}
           <NavLink to="/more" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
             <Menu size={20} />
             <span>More</span>
@@ -86,10 +88,12 @@ const Layout = ({ children }) => {
           <AlertCircle size={24} />
           <span>Tickets</span>
         </NavLink>
-        <NavLink to="/start-work" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-          <Play size={24} />
-          <span>Work</span>
-        </NavLink>
+        {user?.role !== 'client' && (
+          <NavLink to="/start-work" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+            <Play size={24} />
+            <span>Work</span>
+          </NavLink>
+        )}
         <NavLink to="/more" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
           <Menu size={24} />
           <span>More</span>

@@ -79,7 +79,12 @@ const TicketForm = () => {
             const config = {
                 headers: { Authorization: `Bearer ${user.token}` },
             };
-            await axios.post(`${apiBaseUrl}/tickets`, formData, config);
+            const payload = { ...formData };
+            if (!payload.assignedTo) delete payload.assignedTo;
+            if (!payload.inspection) delete payload.inspection;
+            if (!payload.scheduledDate) delete payload.scheduledDate;
+
+            await axios.post(`${apiBaseUrl}/tickets`, payload, config);
             toast.success('Ticket created successfully');
             navigate('/tickets');
         } catch (error) {

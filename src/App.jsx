@@ -11,6 +11,7 @@ import TicketForm from './pages/TicketForm';
 import Schedule from './pages/Schedule';
 import BulkTicketCreate from './pages/BulkTicketCreate';
 import InspectionDetails from './pages/InspectionDetails'; // Added based on new route
+import TicketDetails from './pages/TicketDetails'; // Added based on new route
 import CreateInspection from './pages/CreateInspection';
 import LocationManagement from './pages/LocationManagement';
 import TemplateManagement from './pages/TemplateManagement';
@@ -41,6 +42,7 @@ function App() {
           <Route path="/inspections/:id" element={<PrivateRoute><Layout><InspectionDetails /></Layout></PrivateRoute>} />
           <Route path="/tickets" element={<PrivateRoute><Layout><TicketList /></Layout></PrivateRoute>} />
           <Route path="/tickets/new" element={<PrivateRoute><Layout><TicketForm /></Layout></PrivateRoute>} />
+          <Route path="/tickets/:id" element={<PrivateRoute><Layout><TicketDetails /></Layout></PrivateRoute>} />
           <Route path="/schedule" element={<PrivateRoute><Layout><Schedule /></Layout></PrivateRoute>} />
           <Route path="/tickets/bulk" element={<PrivateRoute><Layout><BulkTicketCreate /></Layout></PrivateRoute>} />
           <Route path="/admin/inspections/create" element={<PrivateRoute><Layout><CreateInspection /></Layout></PrivateRoute>} />

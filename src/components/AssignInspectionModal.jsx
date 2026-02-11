@@ -20,7 +20,7 @@ const AssignInspectionModal = ({ inspection, onClose, onSuccess, users }) => {
                 headers: { Authorization: `Bearer ${user.token}` },
             };
             await axios.patch(`${apiBaseUrl}/inspections/${inspection._id}/assign`,
-                { inspector },
+                { inspector, status: 'pending' },
                 config
             );
             toast.success('Inspection assigned successfully');

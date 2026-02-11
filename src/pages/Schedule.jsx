@@ -38,14 +38,31 @@ const Schedule = () => {
 
     useEffect(() => {
         fetchScheduleData();
-    }, [user]);
+    }, [user, filter, inspectorFilter]);
 
     const fetchScheduleData = async () => {
+        setLoading(true);
         try {
             const config = { headers: { Authorization: `Bearer ${user.token}` } };
+
+            // Build query params based on filters
+            const inspectionParams = {};
+            const ticketParams = {};
+
+            if (inspectorFilter === 'me') {
+                inspectionParams.inspector = user._id;
+            }
+
+            if (filter === 'my_tasks') {
+                ticketParams.assignedTo = user._id;
+                // If "My Tasks" is selected, we should also filter inspections to the user
+                // unless the inspector filter is explicitly set to something else (though UI might prevent this conflict)
+                inspectionParams.inspector = user._id;
+            }
+
             const [inspectionsRes, ticketsRes, usersRes] = await Promise.all([
-                axios.get(`${apiBaseUrl}/inspections`, config),
-                axios.get(`${apiBaseUrl}/tickets`, config),
+                axios.get(`${apiBaseUrl}/inspections`, { ...config, params: inspectionParams }),
+                axios.get(`${apiBaseUrl}/tickets`, { ...config, params: ticketParams }),
                 axios.get(`${apiBaseUrl}/users`, config)
             ]);
 
@@ -80,7 +97,9 @@ const Schedule = () => {
             const allEventsData = [...inspectionEvents, ...ticketEvents];
             setAllEvents(allEventsData);
             setUsers(usersRes.data);
-            applyFilters(allEventsData);
+
+            // Still run client-side date filtering, but user filtering is now server-side
+            applyDateFiltersOnly(allEventsData);
             setLoading(false);
         } catch (error) {
             console.error(error);
@@ -127,7 +146,7 @@ const Schedule = () => {
         return { start, end };
     };
 
-    const applyFilters = (eventsData = allEvents) => {
+    const applyDateFiltersOnly = (eventsData = allEvents) => {
         let filtered = [...eventsData];
 
         // Time period filter
@@ -137,24 +156,18 @@ const Schedule = () => {
             return eventDate >= start && eventDate <= end;
         });
 
-        // Inspector/Assignee filter
-        if (inspectorFilter === 'me') {
-            filtered = filtered.filter(event => event.assignee === user._id);
-        }
-
-        // Task type filter
-        if (filter === 'my_tasks') {
-            filtered = filtered.filter(event => event.assignee === user._id);
-        }
+        // Use backend filtering for user/inspector, so no client-side filtering needed here for those
 
         setEvents(filtered);
     };
 
     useEffect(() => {
         if (allEvents.length > 0) {
-            applyFilters();
+            applyDateFiltersOnly();
         }
-    }, [timePeriod, inspectorFilter, filter, user]);
+    }, [timePeriod]); // Only re-run if time period changes, others trigger fetch
+
+
 
     const eventStyleGetter = (event) => {
         let backgroundColor = '#3b82f6'; // Blue for inspections
@@ -237,20 +250,22 @@ const Schedule = () => {
                         </select>
                     </div>
 
-                    {/* Task Type Filter */}
-                    <div className="filter-btn-group">
-                        <button
-                            className={`filter-btn ${filter === 'all' ? 'active' : ''}`}
-                            onClick={() => setFilter('all')}
-                        >
-                            All Tasks
-                        </button>
-                        <button
-                            className={`filter-btn ${filter === 'my_tasks' ? 'active' : ''}`}
-                            onClick={() => setFilter('my_tasks')}
-                        >
-                            My Tasks
-                        </button>
+                    {/* Task Type Filter - Responsive Tabs */}
+                    <div className="filter-tabs-container">
+                        <div className="filter-tabs">
+                            <button
+                                className={`filter-tab ${filter === 'all' ? 'active' : ''}`}
+                                onClick={() => setFilter('all')}
+                            >
+                                <span>All Tasks</span>
+                            </button>
+                            <button
+                                className={`filter-tab ${filter === 'my_tasks' ? 'active' : ''}`}
+                                onClick={() => setFilter('my_tasks')}
+                            >
+                                <span>My Tasks</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -344,9 +359,11 @@ const Schedule = () => {
                 .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
                 .page-header h1 { display: flex; align-items: center; gap: 10px; margin: 0; }
                 
-                .filter-btn-group { display: flex; background: white; padding: 4px; border-radius: 8px; border: 1px solid #e2e8f0; }
-                .filter-btn { padding: 8px 16px; border: none; background: none; border-radius: 6px; font-size: 14px; font-weight: 500; color: var(--text-muted); cursor: pointer; transition: all 0.2s; }
-                .filter-btn.active { background: var(--primary-color); color: white; }
+                .filter-tabs-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+                .filter-tabs { display: flex; background: #f1f5f9; padding: 4px; border-radius: 12px; gap: 4px; white-space: nowrap; }
+                .filter-tab { padding: 8px 16px; border: none; background: none; border-radius: 8px; font-size: 14px; font-weight: 600; color: var(--text-muted); cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); flex: 1; text-align: center; }
+                .filter-tab:hover { color: var(--text-dark); background: rgba(255,255,255,0.5); }
+                .filter-tab.active { background: white; color: var(--primary-color); shadow: 0 1px 3px rgba(0,0,0,0.1); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
                 
                 .calendar-wrapper { padding: 20px; background: white; border-radius: 12px; box-shadow: var(--shadow-sm); }
                 

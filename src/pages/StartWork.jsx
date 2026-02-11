@@ -90,7 +90,7 @@ const StartWork = () => {
             userId: user._id,
             type, // 'inspection' or 'ticket'
             itemId: item._id,
-            itemName: type === 'inspection' 
+            itemName: type === 'inspection'
                 ? `${item.location?.name || 'Location'} - ${item.template?.name || 'Inspection'}`
                 : item.title,
             startTime: new Date().toISOString(),
@@ -148,13 +148,13 @@ const StartWork = () => {
 
             {/* Active Work Session */}
             {activeWork && (
-                <div className="card" style={{ 
+                <div className="card" style={{
                     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                     color: 'white',
                     marginBottom: '24px',
                     border: 'none'
                 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
                         <div>
                             <h3 style={{ color: 'white', marginBottom: '8px' }}>Active Work Session</h3>
                             <p style={{ margin: 0, opacity: 0.9 }}>
@@ -170,7 +170,9 @@ const StartWork = () => {
                             style={{
                                 background: 'rgba(255,255,255,0.2)',
                                 color: 'white',
-                                border: '1px solid rgba(255,255,255,0.3)'
+                                border: '1px solid rgba(255,255,255,0.3)',
+                                width: 'auto',
+                                whiteSpace: 'nowrap'
                             }}
                         >
                             End Session
@@ -229,15 +231,22 @@ const StartWork = () => {
                                     )}
                                 </div>
 
-                                <button
-                                    onClick={() => startWorkSession('inspection', inspection)}
-                                    className="btn"
-                                    style={{ width: '100%' }}
-                                    disabled={!!activeWork}
-                                >
-                                    <Play size={18} style={{ marginRight: '8px' }} />
-                                    {inspection.status === 'in_progress' ? 'Continue Inspection' : 'Start Inspection'}
-                                </button>
+                                {['completed', 'submitted'].includes(inspection.status) ? (
+                                    <button className="btn btn-secondary" style={{ width: '100%', opacity: 0.7, cursor: 'not-allowed' }} disabled>
+                                        <CheckCircle size={18} style={{ marginRight: '8px' }} />
+                                        Completed
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={() => startWorkSession('inspection', inspection)}
+                                        className="btn"
+                                        style={{ width: '100%' }}
+                                        disabled={!!activeWork}
+                                    >
+                                        <Play size={18} style={{ marginRight: '8px' }} />
+                                        {inspection.status === 'in_progress' ? 'Continue Inspection' : 'Start Inspection'}
+                                    </button>
+                                )}
                             </div>
                         ))}
                     </div>
@@ -280,15 +289,22 @@ const StartWork = () => {
                                     </span>
                                 </div>
 
-                                <button
-                                    onClick={() => startWorkSession('ticket', ticket)}
-                                    className="btn btn-secondary"
-                                    style={{ width: '100%' }}
-                                    disabled={!!activeWork}
-                                >
-                                    <Play size={18} style={{ marginRight: '8px' }} />
-                                    Start Work
-                                </button>
+                                {['resolved', 'closed', 'completed'].includes(ticket.status) ? (
+                                    <button className="btn btn-secondary" style={{ width: '100%', opacity: 0.7, cursor: 'not-allowed' }} disabled>
+                                        <CheckCircle size={18} style={{ marginRight: '8px' }} />
+                                        Resolved
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={() => startWorkSession('ticket', ticket)}
+                                        className="btn btn-secondary"
+                                        style={{ width: '100%' }}
+                                        disabled={!!activeWork}
+                                    >
+                                        <Play size={18} style={{ marginRight: '8px' }} />
+                                        Start Work
+                                    </button>
+                                )}
                             </div>
                         ))}
                     </div>
@@ -305,8 +321,8 @@ const StartWork = () => {
                     <div className="card">
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             {workHistory.map((entry, index) => (
-                                <div key={index} style={{ 
-                                    padding: '12px', 
+                                <div key={index} style={{
+                                    padding: '12px',
                                     background: index % 2 === 0 ? 'var(--bg-soft)' : 'transparent',
                                     borderRadius: '6px',
                                     display: 'flex',

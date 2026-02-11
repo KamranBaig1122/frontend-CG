@@ -1,18 +1,18 @@
 import { useState, useEffect, useContext } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import AuthContext from '../context/AuthContext';
 import { apiBaseUrl } from '../config/api';
-import { Filter, Plus, AlertCircle, User as UserIcon, Calendar, MapPin, CheckCircle, Clock, Search, ArrowUpDown } from 'lucide-react';
+import { Filter, Plus, AlertCircle, User as UserIcon, Calendar, MapPin, CheckCircle, Clock, Search, ArrowUpDown, X, Tag, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import AssignTicketModal from '../components/AssignTicketModal';
 import ScheduleTicketModal from '../components/ScheduleTicketModal';
 import ResolveTicketModal from '../components/ResolveTicketModal';
-import TicketDetailsModal from '../components/TicketDetailsModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const TicketList = () => {
   const { user } = useContext(AuthContext);
+  const navigate = useNavigate();
   const [tickets, setTickets] = useState([]);
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,7 +26,6 @@ const TicketList = () => {
   const [assignModal, setAssignModal] = useState(null);
   const [scheduleModal, setScheduleModal] = useState(null);
   const [resolveModal, setResolveModal] = useState(null);
-  const [detailsModal, setDetailsModal] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -42,8 +41,9 @@ const TicketList = () => {
           axios.get(`${apiBaseUrl}/tickets`, config),
           axios.get(`${apiBaseUrl}/locations`, config)
         ]);
-        setTickets(ticketsRes.data);
-        setLocations(locationsRes.data);
+        console.log('API Response', { tickets: ticketsRes.data, locations: locationsRes.data });
+        setTickets(Array.isArray(ticketsRes.data) ? ticketsRes.data : []);
+        setLocations(Array.isArray(locationsRes.data) ? locationsRes.data : []);
         setLoading(false);
       } catch (error) {
         console.error(error);
@@ -78,105 +78,131 @@ const TicketList = () => {
     }
   };
 
-  const getPriorityBadgeClass = (priority) => {
+  const getPriorityColor = (priority) => {
     switch (priority) {
-      case 'urgent': return 'badge badge-danger';
-      case 'high': return 'badge badge-warning';
-      case 'medium': return 'badge badge-info';
-      default: return 'badge badge-success';
+      case 'urgent': return '#ef4444';
+      case 'high': return '#f97316';
+      case 'medium': return '#eab308';
+      default: return '#10b981';
     }
   };
 
-  const getStatusBadgeClass = (status) => {
-    switch (status) {
-      case 'resolved': return 'badge badge-success';
-      case 'verified': return 'badge badge-primary';
-      case 'in_progress': return 'badge badge-info';
-      default: return 'badge badge-secondary';
+  const getPriorityGradient = (priority) => {
+    switch (priority) {
+      case 'urgent': return 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+      case 'high': return 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)';
+      case 'medium': return 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)';
+      default: return 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
     }
   };
+
+  // Debugging logs
+  console.log('TicketList Render', { user, ticketsIsArray: Array.isArray(tickets), ticketsLen: tickets?.length });
 
   // Filter tickets based on tab, filters, and search
-  let filteredTickets = tickets.filter(ticket => {
+  const safeTickets = Array.isArray(tickets) ? tickets : [];
+  let filteredTickets = safeTickets.filter(ticket => {
+    if (!ticket) return false;
+
     // Tab filters
     if (activeTab === 'inbox' && ['resolved', 'closed', 'verified'].includes(ticket.status)) return false;
     if (activeTab === 'scheduled' && !ticket.scheduledDate) return false;
-    
+    if (activeTab === 'resolved' && !['resolved', 'closed', 'verified'].includes(ticket.status)) return false;
+
     // Status filter
     if (filter !== 'all' && ticket.status !== filter) return false;
-    
+
     // Priority filter
     if (priorityFilter !== 'all' && ticket.priority !== priorityFilter) return false;
-    
+
     // Location filter
     if (locationFilter !== 'all' && ticket.location?._id !== locationFilter) return false;
-    
+
     // Search by Ticket ID
-    if (searchTerm && !ticket._id.toLowerCase().includes(searchTerm.toLowerCase()) && 
-        !ticket.title.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-    
+    if (searchTerm &&
+      !(ticket._id || '').toLowerCase().includes(searchTerm.toLowerCase()) &&
+      !(ticket.title || '').toLowerCase().includes(searchTerm.toLowerCase())) return false;
+
     return true;
   });
 
   // Sort tickets
-  filteredTickets = [...filteredTickets].sort((a, b) => {
+  filteredTickets = Array.isArray(filteredTickets) ? [...filteredTickets].sort((a, b) => {
+    if (!a || !b) return 0;
     switch (sortBy) {
       case 'status_location':
         const statusOrder = { 'open': 1, 'in_progress': 2, 'resolved': 3, 'closed': 4, 'verified': 5 };
         const statusDiff = (statusOrder[a.status] || 99) - (statusOrder[b.status] || 99);
         if (statusDiff !== 0) return statusDiff;
         return (a.location?.name || '').localeCompare(b.location?.name || '');
-      
+
       case 'priority':
         const priorityOrder = { 'urgent': 1, 'high': 2, 'medium': 3, 'low': 4 };
         return (priorityOrder[a.priority] || 99) - (priorityOrder[b.priority] || 99);
-      
+
       case 'old_to_new':
         return new Date(a.createdAt) - new Date(b.createdAt);
-      
+
       case 'new_to_old':
         return new Date(b.createdAt) - new Date(a.createdAt);
-      
+
       case 'recently_active':
         return new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt);
-      
+
       case 'due_soon':
         if (!a.dueDate && !b.dueDate) return 0;
         if (!a.dueDate) return 1;
         if (!b.dueDate) return -1;
         return new Date(a.dueDate) - new Date(b.dueDate);
-      
+
       default:
         return 0;
     }
-  });
+  }) : [];
 
-  if (loading) return <LoadingSpinner message="Loading tickets..." type="three-dots" color="#ef4444" height={60} width={60} />;
+  if (loading) return <LoadingSpinner message="Loading tickets..." type="three-dots" color="#3b82f6" height={60} width={60} />;
 
   return (
     <div className="fade-in">
-      <div className="page-header">
-        <h1>Issues & Tickets</h1>
+      <div className="page-header" style={{ marginBottom: '24px' }}>
+        <div>
+          <h1 style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: 0 }}>
+            <Tag size={28} className="text-primary" />
+            Issues & Tickets
+          </h1>
+          <p className="text-muted" style={{ margin: '8px 0 0 0' }}>
+            Manage and track maintenance tickets
+          </p>
+        </div>
         {(user?.role === 'admin' || user?.role === 'sub_admin') && (
-          <Link to="/tickets/new" className="btn">
-            <Plus size={18} /> Create Ticket
+          <Link to="/tickets/new" className="btn" style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '12px 24px',
+            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+            border: 'none',
+            boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.3)'
+          }}>
+            <Plus size={18} /> New Ticket
           </Link>
         )}
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '2px solid #e2e8f0' }}>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', borderBottom: '2px solid #e2e8f0' }}>
         <button
           onClick={() => setActiveTab('inbox')}
           style={{
             padding: '12px 24px',
             border: 'none',
             background: 'none',
-            borderBottom: activeTab === 'inbox' ? '2px solid var(--primary-color)' : '2px solid transparent',
-            color: activeTab === 'inbox' ? 'var(--primary-color)' : 'var(--text-muted)',
-            fontWeight: activeTab === 'inbox' ? '600' : '400',
+            borderBottom: activeTab === 'inbox' ? '2px solid #3b82f6' : '2px solid transparent',
+            color: activeTab === 'inbox' ? '#3b82f6' : '#64748b',
+            fontWeight: activeTab === 'inbox' ? '600' : '500',
             cursor: 'pointer',
-            marginBottom: '-2px'
+            marginBottom: '-2px',
+            transition: 'all 0.2s'
           }}
         >
           Inbox ({tickets.filter(t => !['resolved', 'closed', 'verified'].includes(t.status)).length})
@@ -187,14 +213,31 @@ const TicketList = () => {
             padding: '12px 24px',
             border: 'none',
             background: 'none',
-            borderBottom: activeTab === 'scheduled' ? '2px solid var(--primary-color)' : '2px solid transparent',
-            color: activeTab === 'scheduled' ? 'var(--primary-color)' : 'var(--text-muted)',
-            fontWeight: activeTab === 'scheduled' ? '600' : '400',
+            borderBottom: activeTab === 'scheduled' ? '2px solid #3b82f6' : '2px solid transparent',
+            color: activeTab === 'scheduled' ? '#3b82f6' : '#64748b',
+            fontWeight: activeTab === 'scheduled' ? '600' : '500',
             cursor: 'pointer',
-            marginBottom: '-2px'
+            marginBottom: '-2px',
+            transition: 'all 0.2s'
           }}
         >
           Scheduled ({tickets.filter(t => t.scheduledDate).length})
+        </button>
+        <button
+          onClick={() => setActiveTab('resolved')}
+          style={{
+            padding: '12px 24px',
+            border: 'none',
+            background: 'none',
+            borderBottom: activeTab === 'resolved' ? '2px solid #3b82f6' : '2px solid transparent',
+            color: activeTab === 'resolved' ? '#3b82f6' : '#64748b',
+            fontWeight: activeTab === 'resolved' ? '600' : '500',
+            cursor: 'pointer',
+            marginBottom: '-2px',
+            transition: 'all 0.2s'
+          }}
+        >
+          Resolved ({tickets.filter(t => ['resolved', 'closed', 'verified'].includes(t.status)).length})
         </button>
         <button
           onClick={() => setActiveTab('all')}
@@ -202,51 +245,108 @@ const TicketList = () => {
             padding: '12px 24px',
             border: 'none',
             background: 'none',
-            borderBottom: activeTab === 'all' ? '2px solid var(--primary-color)' : '2px solid transparent',
-            color: activeTab === 'all' ? 'var(--primary-color)' : 'var(--text-muted)',
-            fontWeight: activeTab === 'all' ? '600' : '400',
+            borderBottom: activeTab === 'all' ? '2px solid #3b82f6' : '2px solid transparent',
+            color: activeTab === 'all' ? '#3b82f6' : '#64748b',
+            fontWeight: activeTab === 'all' ? '600' : '500',
             cursor: 'pointer',
-            marginBottom: '-2px'
+            marginBottom: '-2px',
+            transition: 'all 0.2s'
           }}
         >
           All Tickets ({tickets.length})
         </button>
       </div>
 
-      {/* Search and Filters */}
+      {/* Search Bar */}
+      <div className="card" style={{
+        marginBottom: '24px',
+        padding: '20px',
+        background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+        border: '1px solid #e2e8f0',
+        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+      }}>
+        <div style={{ position: 'relative' }}>
+          <Search
+            size={20}
+            style={{
+              position: 'absolute',
+              left: '16px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: '#94a3b8',
+              pointerEvents: 'none'
+            }}
+          />
+          <input
+            type="text"
+            placeholder="Search by Ticket ID or Title..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '12px 16px 12px 48px',
+              border: '1px solid #e2e8f0',
+              borderRadius: '10px',
+              fontSize: '15px',
+              background: 'white',
+              transition: 'all 0.2s',
+              outline: 'none'
+            }}
+            onFocus={(e) => {
+              e.target.style.borderColor = '#3b82f6';
+              e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = '#e2e8f0';
+              e.target.style.boxShadow = 'none';
+            }}
+          />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              style={{
+                position: 'absolute',
+                right: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '4px',
+                borderRadius: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                color: '#94a3b8'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#f1f5f9';
+                e.currentTarget.style.color = '#64748b';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+                e.currentTarget.style.color = '#94a3b8';
+              }}
+            >
+              <X size={18} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Filters */}
       <div className="filter-section" style={{ marginBottom: '20px', padding: '16px', background: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px', flexWrap: 'wrap' }}>
           <Filter size={18} className="text-muted" />
           <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: 'var(--text-dark)' }}>Filters</h3>
         </div>
 
-        {/* Search */}
-        <div style={{ marginBottom: '12px' }}>
-          <div style={{ position: 'relative' }}>
-            <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-            <input
-              type="text"
-              placeholder="Search by Ticket ID or Title"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 12px 8px 40px',
-                border: '1px solid #e2e8f0',
-                borderRadius: '6px',
-                fontSize: '14px'
-              }}
-            />
-          </div>
-        </div>
-
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
           {/* Status Filter */}
           <div>
             <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '6px', color: 'var(--text-muted)' }}>Status</label>
-            <select 
-              value={filter} 
-              onChange={(e) => setFilter(e.target.value)} 
+            <select
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
               className="filter-select"
               style={{ width: '100%', padding: '8px', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '14px' }}
             >
@@ -262,9 +362,9 @@ const TicketList = () => {
           {/* Priority Filter */}
           <div>
             <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '6px', color: 'var(--text-muted)' }}>Priority</label>
-            <select 
-              value={priorityFilter} 
-              onChange={(e) => setPriorityFilter(e.target.value)} 
+            <select
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value)}
               className="filter-select"
               style={{ width: '100%', padding: '8px', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '14px' }}
             >
@@ -279,9 +379,9 @@ const TicketList = () => {
           {/* Location Filter */}
           <div>
             <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '6px', color: 'var(--text-muted)' }}>Location</label>
-            <select 
-              value={locationFilter} 
-              onChange={(e) => setLocationFilter(e.target.value)} 
+            <select
+              value={locationFilter}
+              onChange={(e) => setLocationFilter(e.target.value)}
               className="filter-select"
               style={{ width: '100%', padding: '8px', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '14px' }}
             >
@@ -298,9 +398,9 @@ const TicketList = () => {
               <ArrowUpDown size={14} style={{ display: 'inline', marginRight: '4px' }} />
               Sort By
             </label>
-            <select 
-              value={sortBy} 
-              onChange={(e) => setSortBy(e.target.value)} 
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
               className="filter-select"
               style={{ width: '100%', padding: '8px', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '14px' }}
             >
@@ -315,131 +415,376 @@ const TicketList = () => {
         </div>
       </div>
 
-      <div className="grid-cards">
-        {filteredTickets.map(ticket => (
-          <div
-            key={ticket._id}
-            className="card cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => setDetailsModal(ticket)}
-          >
-            <div className="flex justify-between items-start mb-3">
-              <span className={getPriorityBadgeClass(ticket.priority)}>
+      <div className="grid-cards" style={{
+        gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))',
+        gap: '24px'
+      }}>
+        {filteredTickets.map(ticket => {
+          const priorityColor = getPriorityColor(ticket.priority);
+          const priorityGradient = getPriorityGradient(ticket.priority);
+
+          return (
+            <div
+              key={ticket._id}
+              className="card"
+              style={{
+                background: 'white',
+                borderRadius: '16px',
+                padding: '24px',
+                border: '1px solid #e2e8f0',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                transition: 'all 0.3s ease',
+                position: 'relative',
+                overflow: 'hidden',
+                cursor: 'pointer'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-4px)';
+                e.currentTarget.style.boxShadow = '0 12px 24px -4px rgba(0, 0, 0, 0.15)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
+              }}
+              onClick={() => navigate(`/tickets/${ticket._id}`, { state: { ticket } })}
+              role="button"
+              tabIndex={0}
+            >
+              {/* Priority Badge - Top Right */}
+              <div style={{
+                position: 'absolute',
+                top: '20px',
+                right: '20px',
+                background: priorityGradient,
+                color: 'white',
+                padding: '6px 16px',
+                borderRadius: '20px',
+                fontSize: '14px',
+                fontWeight: '700',
+                textTransform: 'uppercase',
+                boxShadow: `0 4px 12px ${priorityColor}40`,
+                zIndex: 1
+              }}>
                 {ticket.priority}
-              </span>
-              <span className="text-xs text-muted font-medium bg-slate-100 px-2 py-1 rounded-md">
-                {new Date(ticket.createdAt).toLocaleDateString()}
-              </span>
-            </div>
-
-            <h3 className="text-lg font-bold mb-2">{ticket.title}</h3>
-
-            <div className="flex items-center gap-2 text-sm text-muted mb-3">
-              <MapPin size={14} />
-              {ticket.location?.name || 'Unknown Location'}
-            </div>
-
-            <p className="text-sm text-slate-600 mb-4 line-clamp-2 min-h-[40px]">
-              {ticket.description}
-            </p>
-
-            {ticket.scheduledDate && (
-              <div className="mb-4 flex items-center gap-2 text-sm text-blue-600 bg-blue-50 p-2 rounded-md">
-                <Calendar size={14} />
-                <span className="font-medium">Scheduled: {new Date(ticket.scheduledDate).toLocaleDateString()}</span>
               </div>
-            )}
 
-            <div className="flex justify-between items-center pt-4 border-t border-slate-100" onClick={e => e.stopPropagation()}>
-              <span className={getStatusBadgeClass(ticket.status)}>
-                {ticket.status.replace('_', ' ')}
-              </span>
+              {/* Status Indicators */}
+              <div style={{
+                display: 'flex',
+                gap: '8px',
+                marginBottom: '16px',
+                flexWrap: 'wrap',
+                alignItems: 'center'
+              }}>
+                <span style={{
+                  fontSize: '11px',
+                  color: '#64748b',
+                  fontWeight: '600',
+                  textTransform: 'uppercase',
+                  background: '#f1f5f9',
+                  padding: '4px 8px',
+                  borderRadius: '6px'
+                }}>
+                  #{ticket._id.substr(-6)}
+                </span>
+              </div>
 
-              <div className="flex gap-2">
-                {(user?.role === 'admin' || user?.role === 'sub_admin') && !['resolved', 'closed'].includes(ticket.status) && (
-                  <>
-                    {!ticket.assignedTo && (
+              {/* Title & Location */}
+              <div style={{ marginBottom: '20px', paddingRight: '100px' }}>
+                <h3 style={{
+                  fontSize: '18px',
+                  fontWeight: '700',
+                  margin: '0 0 8px 0',
+                  color: '#1e293b',
+                  lineHeight: '1.4'
+                }}>
+                  {ticket.title}
+                </h3>
+                <p style={{
+                  fontSize: '14px',
+                  color: '#64748b',
+                  margin: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  <MapPin size={16} />
+                  {ticket.location?.name || 'Unknown Location'}
+                </p>
+              </div>
+
+              {/* Info Cards */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '12px',
+                marginBottom: '20px'
+              }}>
+                <div style={{
+                  padding: '12px',
+                  background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                  borderRadius: '10px',
+                  border: '1px solid #e2e8f0'
+                }}>
+                  <div style={{
+                    fontSize: '11px',
+                    color: '#64748b',
+                    fontWeight: '600',
+                    textTransform: 'uppercase',
+                    marginBottom: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    <UserIcon size={12} />
+                    Assignee
+                  </div>
+                  <div style={{
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: '#1e293b',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}>
+                    {ticket.assignedTo?.name || 'Unassigned'}
+                  </div>
+                </div>
+                <div style={{
+                  padding: '12px',
+                  background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                  borderRadius: '10px',
+                  border: '1px solid #e2e8f0'
+                }}>
+                  <div style={{
+                    fontSize: '11px',
+                    color: '#64748b',
+                    fontWeight: '600',
+                    textTransform: 'uppercase',
+                    marginBottom: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    <Clock size={12} />
+                    {ticket.scheduledDate ? 'Scheduled' : 'Created'}
+                  </div>
+                  <div style={{
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: '#1e293b'
+                  }}>
+                    {new Date(ticket.scheduledDate || ticket.createdAt).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric'
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Badge */}
+              <div style={{
+                marginBottom: '20px',
+                display: 'inline-block'
+              }}>
+                <span style={{
+                  padding: '6px 14px',
+                  background: ['resolved', 'verified', 'closed'].includes(ticket.status) ?
+                    'linear-gradient(135deg, #10b981 0%, #059669 100%)' :
+                    ticket.status === 'in_progress' ?
+                      'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' :
+                      'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  color: 'white',
+                  borderRadius: '20px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  textTransform: 'capitalize',
+                  boxShadow: ['resolved', 'verified', 'closed'].includes(ticket.status) ?
+                    '0 4px 12px rgba(16, 185, 129, 0.3)' :
+                    ticket.status === 'in_progress' ?
+                      '0 4px 12px rgba(59, 130, 246, 0.3)' :
+                      '0 4px 12px rgba(245, 158, 11, 0.3)'
+                }}>
+                  {ticket.status.replace('_', ' ')}
+                </span>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                paddingTop: '20px',
+                borderTop: '1px solid #e2e8f0',
+                gap: '8px'
+              }} onClick={e => e.stopPropagation()}>
+                <div style={{ display: 'flex', gap: '8px', flex: 1 }}>
+                  {(user?.role === 'admin' || user?.role === 'sub_admin') && !['resolved', 'closed'].includes(ticket.status) && (
+                    <>
+                      {!ticket.assignedTo && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setAssignModal(ticket); }}
+                          title="Assign ticket"
+                          style={{
+                            padding: '10px',
+                            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '10px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'scale(1.05)';
+                            e.currentTarget.style.boxShadow = '0 4px 8px rgba(59, 130, 246, 0.4)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'scale(1)';
+                            e.currentTarget.style.boxShadow = '0 2px 4px rgba(59, 130, 246, 0.3)';
+                          }}
+                        >
+                          <UserIcon size={18} />
+                        </button>
+                      )}
+                      {!ticket.scheduledDate && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setScheduleModal(ticket); }}
+                          title="Schedule ticket"
+                          style={{
+                            padding: '10px',
+                            background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '10px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: '0 2px 4px rgba(139, 92, 246, 0.3)'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'scale(1.05)';
+                            e.currentTarget.style.boxShadow = '0 4px 8px rgba(139, 92, 246, 0.4)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'scale(1)';
+                            e.currentTarget.style.boxShadow = '0 2px 4px rgba(139, 92, 246, 0.3)';
+                          }}
+                        >
+                          <Calendar size={18} />
+                        </button>
+                      )}
+                    </>
+                  )}
+
+                  {/* Supervisor Actions */}
+                  {user?.role === 'supervisor' && ticket.status === 'open' && (
+                    <>
                       <button
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
-                        onClick={(e) => { e.stopPropagation(); setAssignModal(ticket); }}
-                        title="Assign ticket"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          try {
+                            const config = { headers: { Authorization: `Bearer ${user.token}` } };
+                            await axios.put(`${apiBaseUrl}/tickets/${ticket._id}`, {
+                              ...ticket,
+                              location: ticket.location._id, // Ensure ID is sent
+                              status: 'in_progress'
+                            }, config);
+                            toast.success('Ticket status updated to In Progress!');
+                            refetchTickets();
+                          } catch (error) {
+                            console.error(error);
+                            toast.error('Failed to update ticket status');
+                          }
+                        }}
+                        title="Start Work"
+                        style={{
+                          padding: '10px',
+                          background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '10px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
+                        }}
                       >
-                        <UserIcon size={18} />
+                        <Clock size={18} />
                       </button>
-                    )}
-                    {!ticket.scheduledDate && (
                       <button
-                        className="p-2 text-purple-600 hover:bg-purple-50 rounded-full transition-colors"
-                        onClick={(e) => { e.stopPropagation(); setScheduleModal(ticket); }}
-                        title="Schedule ticket"
+                        onClick={(e) => { e.stopPropagation(); setResolveModal(ticket); }}
+                        title="Mark as resolved"
+                        style={{
+                          padding: '10px',
+                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '10px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)'
+                        }}
                       >
-                        <Calendar size={18} />
+                        <CheckCircle size={18} />
                       </button>
-                    )}
-                  </>
-                )}
-                {user?.role === 'supervisor' && ticket.status === 'open' && (
-                  <>
+                    </>
+                  )}
+                  {user?.role === 'supervisor' && ticket.status === 'in_progress' && (
                     <button
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        try {
-                          const config = { headers: { Authorization: `Bearer ${user.token}` } };
-                          await axios.put(`${apiBaseUrl}/tickets/${ticket._id}`, {
-                            title: ticket.title,
-                            description: ticket.description,
-                            location: ticket.location._id || ticket.location,
-                            priority: ticket.priority,
-                            status: 'in_progress'
-                          }, config);
-                          toast.success('Ticket status updated to In Progress!');
-                          refetchTickets();
-                        } catch (error) {
-                          console.error(error);
-                          toast.error('Failed to update ticket status');
-                        }
-                      }}
-                      title="Start Work"
-                    >
-                      <Clock size={18} />
-                    </button>
-                    <button
-                      className="p-2 text-green-600 hover:bg-green-50 rounded-full transition-colors"
                       onClick={(e) => { e.stopPropagation(); setResolveModal(ticket); }}
                       title="Mark as resolved"
+                      style={{
+                        padding: '10px',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '10px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)'
+                      }}
                     >
                       <CheckCircle size={18} />
                     </button>
-                  </>
-                )}
-                {user?.role === 'supervisor' && ticket.status === 'in_progress' && (
-                  <button
-                    className="p-2 text-green-600 hover:bg-green-50 rounded-full transition-colors"
-                    onClick={(e) => { e.stopPropagation(); setResolveModal(ticket); }}
-                    title="Mark as resolved"
-                  >
-                    <CheckCircle size={18} />
-                  </button>
-                )}
-                <div className="ml-2 text-xs text-muted flex items-center" title="Assignee">
-                  {ticket.assignedTo ? (
-                    <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold">
-                      {ticket.assignedTo.name.charAt(0)}
-                    </div>
-                  ) : (
-                    <span className="italic">Unassigned</span>
                   )}
                 </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         {filteredTickets.length === 0 && (
-          <div className="col-span-full text-center py-12 text-muted">
-            <div className="mb-4 inline-flex p-4 bg-slate-100 rounded-full">
-              <AlertCircle size={32} />
+          <div style={{
+            gridColumn: '1 / -1',
+            textAlign: 'center',
+            padding: '60px 20px',
+            background: 'white',
+            borderRadius: '16px',
+            border: '1px solid #e2e8f0'
+          }}>
+            <div style={{
+              marginBottom: '20px',
+              display: 'inline-flex',
+              padding: '24px',
+              borderRadius: '50%',
+              background: '#f1f5f9',
+              color: '#94a3b8'
+            }}>
+              <AlertCircle size={48} />
             </div>
-            <p>No tickets found matching your filters.</p>
+            <h3 style={{ color: '#1e293b', marginBottom: '8px' }}>No tickets found</h3>
+            <p style={{ color: '#64748b' }}>Try adjusting your search or filters</p>
           </div>
         )}
       </div>
@@ -470,12 +815,6 @@ const TicketList = () => {
         />
       )}
 
-      {detailsModal && (
-        <TicketDetailsModal
-          ticket={detailsModal}
-          onClose={() => setDetailsModal(null)}
-        />
-      )}
     </div>
   );
 };

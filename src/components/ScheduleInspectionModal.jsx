@@ -4,6 +4,7 @@ import AuthContext from '../context/AuthContext';
 import { apiBaseUrl } from '../config/api';
 import toast from 'react-hot-toast';
 import { X, Calendar } from 'lucide-react';
+import LoadingSpinner from './LoadingSpinner';
 
 const ScheduleInspectionModal = ({ inspection, onClose, onSuccess }) => {
     const { user } = useContext(AuthContext);
@@ -21,7 +22,7 @@ const ScheduleInspectionModal = ({ inspection, onClose, onSuccess }) => {
                 headers: { Authorization: `Bearer ${user.token}` },
             };
             await axios.patch(`${apiBaseUrl}/inspections/${inspection._id}/schedule`,
-                { scheduledDate },
+                { scheduledDate, status: 'pending' },
                 config
             );
             toast.success('Inspection scheduled successfully');

@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import AuthContext from '../context/AuthContext';
 import { apiBaseUrl } from '../config/api';
-import { ArrowLeft, Download, Calendar, User } from 'lucide-react';
+import { ArrowLeft, Download, Calendar, User, ClipboardList } from 'lucide-react';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../components/LoadingSpinner';
 
@@ -14,6 +14,9 @@ const InspectionDetails = () => {
     const [inspection, setInspection] = useState(null);
     const [loading, setLoading] = useState(true);
     const [showBulkModal, setShowBulkModal] = useState(false);
+    const [showAssignModal, setShowAssignModal] = useState(false); // For re-assign
+    const [users, setUsers] = useState([]); // For re-assign
+    const [selectedInspector, setSelectedInspector] = useState('');
 
     useEffect(() => {
         const fetchInspection = async () => {
@@ -22,8 +25,27 @@ const InspectionDetails = () => {
                 const config = {
                     headers: { Authorization: `Bearer ${user.token}` },
                 };
-                const { data } = await axios.get(`${apiBaseUrl}/inspections/${id}`, config);
-                setInspection(data);
+
+                const promises = [axios.get(`${apiBaseUrl}/inspections/${id}`, config)];
+
+                if (user.role === 'admin' || user.role === 'sub_admin') {
+                    promises.push(axios.get(`${apiBaseUrl}/users`, config));
+                }
+
+                const results = await Promise.all(promises);
+                const inspectionData = results[0].data;
+                setInspection(inspectionData);
+
+                if (results[1]) {
+                    setUsers(results[1].data.filter(u => u.role === 'supervisor' || u.role === 'inspector'));
+                }
+
+                if (inspectionData.inspector && (typeof inspectionData.inspector === 'object')) {
+                    setSelectedInspector(inspectionData.inspector._id);
+                } else if (inspectionData.inspector) {
+                    setSelectedInspector(inspectionData.inspector);
+                }
+
                 setLoading(false);
             } catch (error) {
                 console.error(error);
@@ -33,6 +55,27 @@ const InspectionDetails = () => {
         };
         fetchInspection();
     }, [id, user]);
+
+    const handleResumeInspection = () => {
+        navigate(`/inspections/${id}/perform`);
+    };
+
+    const handleReassign = async () => {
+        try {
+            const config = { headers: { Authorization: `Bearer ${user.token}` } };
+            await axios.put(`${apiBaseUrl}/inspections/${id}`, { ...inspection, inspector: selectedInspector, status: 'pending' }, config);
+
+            // Update local state
+            const inspectorObj = users.find(u => u._id === selectedInspector);
+            setInspection({ ...inspection, inspector: inspectorObj, status: 'pending' });
+
+            toast.success('Inspector re-assigned successfully');
+            setShowAssignModal(false);
+        } catch (error) {
+            console.error(error);
+            toast.error('Failed to re-assign inspector');
+        }
+    };
 
     const handleDownloadPDF = async () => {
         try {
@@ -134,11 +177,26 @@ const InspectionDetails = () => {
                     <ArrowLeft size={18} /> Back to Inspections
                 </Link>
                 <div className="header-actions">
+                    {/* Start/Resume Inspection Button */}
+                    {['pending', 'in_progress'].includes(inspection.status) && (user._id === inspection.inspector?._id || user._id === inspection.inspector) && (
+                        (!inspection.scheduledDate || new Date() >= new Date(inspection.scheduledDate)) ? (
+                            <button onClick={handleResumeInspection} className="btn btn-primary" style={{ backgroundColor: '#10b981', borderColor: '#10b981' }}>
+                                <ClipboardList size={18} /> {inspection.status === 'pending' ? 'Start Inspection' : 'Resume Inspection'}
+                            </button>
+                        ) : (
+                            <button disabled className="btn btn-secondary" style={{ cursor: 'not-allowed', opacity: 0.7 }} title={`Scheduled for ${new Date(inspection.scheduledDate).toLocaleString()}`}>
+                                <ClipboardList size={18} /> Scheduled: {new Date(inspection.scheduledDate).toLocaleDateString()}
+                            </button>
+                        )
+                    )}
+
+                    {/* Create Tickets Button */}
                     {(user?.role === 'admin' || user?.role === 'sub_admin') && getAllFailedItems().length > 1 && (
                         <button onClick={() => setShowBulkModal(true)} className="btn btn-secondary">
                             Create Tickets ({getAllFailedItems().length} failures)
                         </button>
                     )}
+
                     <button onClick={handleDownloadPDF} className="btn btn-primary">
                         <Download size={18} /> Download PDF
                     </button>
@@ -152,6 +210,14 @@ const InspectionDetails = () => {
                         <p className="subtitle">
                             <Calendar size={14} /> {new Date(inspection.createdAt).toLocaleDateString()} •
                             <User size={14} /> {inspection.inspector?.name || 'Unknown'}
+                            {(user?.role === 'admin' || user?.role === 'sub_admin') && (
+                                <button
+                                    onClick={() => setShowAssignModal(true)}
+                                    style={{ background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer', marginLeft: '5px', padding: 0, fontSize: '13px' }}
+                                >
+                                    (Edit)
+                                </button>
+                            )}
                         </p>
                     </div>
                     <div className={`score-badge ${getScoreColor(inspection.totalScore)}`}>
@@ -236,6 +302,31 @@ const InspectionDetails = () => {
                         </div>
 
                         <button className="modal-close" onClick={() => setShowBulkModal(false)}>Cancel</button>
+                    </div>
+                </div>
+            )}
+
+            {showAssignModal && (
+                <div className="modal-overlay" onClick={() => setShowAssignModal(false)}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                        <h2>Re-assign Inspector</h2>
+                        <div style={{ marginBottom: '20px' }}>
+                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>Select Inspector</label>
+                            <select
+                                value={selectedInspector}
+                                onChange={(e) => setSelectedInspector(e.target.value)}
+                                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                            >
+                                <option value="">Select Inspector</option>
+                                {users.map(u => (
+                                    <option key={u._id} value={u._id}>{u.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                            <button className="btn btn-secondary" onClick={() => setShowAssignModal(false)}>Cancel</button>
+                            <button className="btn btn-primary" onClick={handleReassign}>Save Changes</button>
+                        </div>
                     </div>
                 </div>
             )}
