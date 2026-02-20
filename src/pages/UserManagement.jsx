@@ -316,11 +316,12 @@ const UserManagement = () => {
                 .search-bar input { border: none; outline: none; width: 100%; font-size: 16px; }
                 
                 .users-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
-                .user-card { background: white; padding: 20px; border-radius: 12px; box-shadow: var(--shadow-sm); display: flex; justify-content: space-between; align-items: center; }
-                .user-info { display: flex; align-items: center; gap: 15px; flex: 1; }
+                .user-card { background: white; padding: 20px; border-radius: 12px; box-shadow: var(--shadow-sm); display: flex; justify-content: space-between; align-items: center; gap: 10px; overflow: hidden; }
+                .user-info { display: flex; align-items: center; gap: 15px; flex: 1; min-width: 0; }
+                .user-info > div:last-child { min-width: 0; }
                 .user-avatar { width: 48px; height: 48px; background: var(--primary-color); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; flex-shrink: 0; }
-                .user-info h3 { margin: 0 0 4px 0; font-size: 16px; }
-                .email { margin: 0 0 8px 0; font-size: 13px; color: var(--text-muted); }
+                .user-info h3 { margin: 0 0 4px 0; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                .email { margin: 0 0 8px 0; font-size: 13px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
                 .location-count { margin: 4px 0 0 0; font-size: 12px; color: var(--primary-color); font-weight: 500; }
                 .permissions-indicator { margin-top: 6px; font-size: 11px; color: var(--text-muted); display: flex; gap: 8px; }
                 .role-badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; text-transform: uppercase; font-weight: 600; }
@@ -329,7 +330,7 @@ const UserManagement = () => {
                 .role-badge.supervisor { background: #dbeafe; color: #1e40af; }
                 .role-badge.client { background: #dcfce7; color: #166534; }
                 
-                .user-actions { display: flex; gap: 8px; }
+                .user-actions { display: flex; gap: 8px; flex-shrink: 0; }
                 .action-btn { background: none; border: none; padding: 8px; border-radius: 8px; cursor: pointer; color: var(--text-muted); transition: all 0.2s; }
                 .action-btn:hover { background: #f1f5f9; color: var(--text-dark); }
                 .action-btn.delete:hover { background: #fee2e2; color: #ef4444; }

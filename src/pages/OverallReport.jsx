@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import AuthContext from '../context/AuthContext';
 import { apiBaseUrl } from '../config/api';
-import { BarChart3, TrendingDown, MapPin, Download, Calendar, ArrowLeft } from 'lucide-react';
+import { BarChart3, TrendingDown, MapPin, Download, Calendar, ArrowLeft, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../components/LoadingSpinner';
 import DatePicker from 'react-datepicker';

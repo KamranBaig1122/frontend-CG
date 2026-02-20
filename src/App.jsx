@@ -15,6 +15,7 @@ import TicketDetails from './pages/TicketDetails'; // Added based on new route
 import CreateInspection from './pages/CreateInspection';
 import LocationManagement from './pages/LocationManagement';
 import TemplateManagement from './pages/TemplateManagement';
+import TemplateForm from './pages/TemplateForm';
 
 import UserManagement from './pages/UserManagement';
 import HelpSupport from './pages/HelpSupport';
@@ -50,6 +51,8 @@ function App() {
           <Route path="/admin/templates" element={<PrivateRoute><Layout><TemplateManagement /></Layout></PrivateRoute>} />
           <Route path="/locations" element={<PrivateRoute><Layout><LocationManagement /></Layout></PrivateRoute>} />
           <Route path="/templates" element={<PrivateRoute><Layout><TemplateManagement /></Layout></PrivateRoute>} />
+          <Route path="/templates/new" element={<PrivateRoute><Layout><TemplateForm /></Layout></PrivateRoute>} />
+          <Route path="/templates/edit/:id" element={<PrivateRoute><Layout><TemplateForm /></Layout></PrivateRoute>} />
           <Route path="/users" element={<PrivateRoute><Layout><UserManagement /></Layout></PrivateRoute>} />
           <Route path="/reports" element={<PrivateRoute><Layout><Reports /></Layout></PrivateRoute>} />
           <Route path="/reports/overall" element={<PrivateRoute><Layout><OverallReport /></Layout></PrivateRoute>} />

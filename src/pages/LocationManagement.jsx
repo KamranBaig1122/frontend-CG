@@ -70,6 +70,7 @@ const LocationManagement = () => {
             address: location.address || '',
         });
         setShowForm(true);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     const handleDelete = async (id) => {
